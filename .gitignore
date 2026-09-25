@@ -1,0 +1,18 @@
+# Environments
+venv/
+env/
+.env
+__pycache__/
+*.pyc
+
+# Streamlit secrets (VERY IMPORTANT)
+.streamlit/secrets.toml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# VSCode / IDE
+.vscode/
+.idea/
+.gemini/
