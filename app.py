@@ -24,7 +24,7 @@ def main():
     
     menu = st.sidebar.radio(
         "Menu Navigasi", 
-        ["📊 Dashboard", "📅 Laporan Harian", "📈 Analisis Stok", "📦 Master Barang", "📥 Transaksi Stok", "🔄 Sinkronisasi"]
+        ["📊 Dashboard", "📥 Input Transaksi Stok","📅 Laporan Harian", "📈 Analisis Stok", "📦 Master Barang", ]
     )
     
     st.sidebar.markdown("---")
@@ -33,16 +33,16 @@ def main():
     # Routing
     if menu == "📊 Dashboard":
         show_dashboard()
+    elif menu == "📥 Input Transaksi Stok":
+        show_transaksi()
     elif menu == "📅 Laporan Harian":
         show_laporan_harian()
     elif menu == "📈 Analisis Stok":
         show_analisis_stok()
     elif menu == "📦 Master Barang":
         show_master_barang()
-    elif menu == "📥 Transaksi Stok":
-        show_transaksi()
-    elif menu == "🔄 Sinkronisasi":
-        show_sinkronisasi()
+    # elif menu == "🔄 Sinkronisasi":
+    #     show_sinkronisasi()
 
 if __name__ == "__main__":
     os.makedirs("data", exist_ok=True)
