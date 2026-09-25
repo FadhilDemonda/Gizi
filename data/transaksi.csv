@@ -1,0 +1,4 @@
+id_transaksi,tanggal,jenis,kode_barang,jumlah,petugas,shift,keterangan
+T001,2026-09-24,Masuk,B001,50,Admin,Pagi,Restock bulanan
+T002,2026-09-24,Keluar,B002,5,Dapur,Siang,Dipakai dapur
+T0003,2026-09-24,Masuk,B001,101,Jono,Pagi,

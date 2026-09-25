@@ -1,0 +1,7 @@
+kode_barang,nama_barang,satuan,stok_minimum,stok_sekarang
+B001,Beras,Kg,10,201
+B002,Gula,Kg,5,50
+B003,Minyak Goreng,Liter,5,20
+B004,Air,Liter,10,0
+B005,Ginger,Kg,15,1
+B006,Semen,Kg,10,11
