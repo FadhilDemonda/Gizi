@@ -3,12 +3,12 @@ import os
 import logging
 from styles.theme import inject_custom_css
 from utils.state import init_session_state
-from pages.dashboard import show_dashboard
-from pages.master_barang import show_master_barang
-from pages.transaksi import show_transaksi
-from pages.laporan_harian import show_laporan_harian
-from pages.analisis_stok import show_analisis_stok
-from pages.sinkronisasi import show_sinkronisasi
+from views.dashboard import show_dashboard
+from views.master_barang import show_master_barang
+from views.transaksi import show_transaksi
+from views.laporan_harian import show_laporan_harian
+from views.analisis_stok import show_analisis_stok
+from views.sinkronisasi import show_sinkronisasi
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s - %(message)s")
