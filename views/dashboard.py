@@ -106,6 +106,13 @@ def show_dashboard():
         if not df_masuk_filter.empty:
             if 'supplier' not in df_masuk_filter.columns:
                 df_masuk_filter['supplier'] = df_masuk_filter['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
+            else:
+                df_masuk_filter['supplier'] = df_masuk_filter.apply(
+                    lambda row: row['keterangan'].split('| Supplier:')[1].split('|')[0].strip()
+                    if (pd.isna(row['supplier']) or str(row['supplier']).strip() in ['', 'Unknown']) and '| Supplier:' in str(row['keterangan'])
+                    else row['supplier'],
+                    axis=1
+                )
             extra_sups = [s for s in df_masuk_filter['supplier'].dropna().unique() if s not in available_sups and str(s).strip() != '']
             available_sups.extend(extra_sups)
             
@@ -132,8 +139,8 @@ def show_dashboard():
         
     with col_date:
         today = datetime.date.today()
-        first_day_of_month = today.replace(day=1)
-        date_range = st.date_input("📅 Rentang Waktu Analisis:", value=(first_day_of_month, today))
+        default_start = today - datetime.timedelta(days=7) if today.day <= 3 else today.replace(day=1)
+        date_range = st.date_input("📅 Rentang Waktu Analisis:", value=(default_start, today))
         
     if len(date_range) != 2:
         st.warning("Silakan lengkapi rentang tanggal (Mulai - Akhir) untuk melihat analisis.")
@@ -276,15 +283,15 @@ def show_dashboard():
             st.info("Belum ada data biaya pengeluaran untuk dianalisis.")
             
     with col_data:
-        st.subheader("Top Pengguna (Berdasarkan Biaya)")
-        if not hist_keluar.empty and 'kategori_freetext' in hist_keluar.columns and 'total_harga' in hist_keluar.columns:
-            top_users = hist_keluar.groupby(['kategori_freetext', 'Sumber'])['total_harga'].sum().reset_index()
-            top_users = top_users.sort_values(by='total_harga', ascending=False).head(10)
+        st.subheader("Top Kategori (Berdasarkan Biaya)")
+        if not hist_keluar.empty and 'kategori' in hist_keluar.columns and 'total_harga' in hist_keluar.columns:
+            top_cats = hist_keluar.groupby(['kategori', 'Sumber'])['total_harga'].sum().reset_index()
+            top_cats = top_cats.sort_values(by='total_harga', ascending=False).head(25)
             
             fig_bar = px.bar(
-                top_users, 
+                top_cats, 
                 x='total_harga', 
-                y='kategori_freetext', 
+                y='kategori', 
                 color='Sumber',
                 orientation='h',
                 color_discrete_sequence=px.colors.qualitative.Pastel,
@@ -306,35 +313,41 @@ def show_dashboard():
             )
             st.plotly_chart(fig_bar, use_container_width=True)
         else:
-            st.info("Belum ada riwayat biaya siapa yang memakai barang ini.")
+            st.info("Belum ada riwayat biaya kategori yang memakai barang ini.")
 
     st.divider()
     
     st.subheader("Beban Pengeluaran per Supplier (Belanja)")
     if not hist_masuk.empty and 'total_harga' in hist_masuk.columns:
-        # Check if supplier column exists (we just added it), fallback to parsing keterangan or 'Unknown'
         if 'supplier' not in hist_masuk.columns:
             hist_masuk['supplier'] = hist_masuk['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
+        else:
+            hist_masuk['supplier'] = hist_masuk.apply(
+                lambda row: row['keterangan'].split('| Supplier:')[1].split('|')[0].strip()
+                if (pd.isna(row['supplier']) or str(row['supplier']).strip() in ['', 'Unknown']) and '| Supplier:' in str(row['keterangan'])
+                else row['supplier'],
+                axis=1
+            )
+        hist_masuk['supplier'] = hist_masuk['supplier'].fillna('Unknown').replace('', 'Unknown')
             
-        # Stacked bar by item and supplier
-        supplier_data = hist_masuk.groupby(['nama_barang', 'supplier'])['total_harga'].sum().reset_index()
-        supplier_data = supplier_data.sort_values(by=['nama_barang', 'total_harga'], ascending=[True, False])
+        # Total per supplier (bukan per barang), limit max 25
+        supplier_data = hist_masuk.groupby('supplier')['total_harga'].sum().reset_index()
+        supplier_data = supplier_data.sort_values(by='total_harga', ascending=False).head(25)
         
         fig_sup = px.bar(
             supplier_data,
-            x='nama_barang',
+            x='supplier',
             y='total_harga',
             color='supplier',
             text='total_harga',
             color_discrete_sequence=px.colors.qualitative.Pastel
         )
-        fig_sup.update_traces(texttemplate='Rp %{text:,.0f}', textposition='inside')
+        fig_sup.update_traces(texttemplate='Rp %{text:,.0f}', textposition='outside')
         fig_sup.update_layout(
-            barmode='stack',
-            margin=dict(t=10, b=0, l=0, r=0),
-            xaxis_title="Nama Barang",
-            yaxis_title="Total Biaya (Rp)",
-            legend_title="Supplier"
+            margin=dict(t=20, b=0, l=0, r=0),
+            xaxis_title="Supplier",
+            yaxis_title="Total Biaya Belanja (Rp)",
+            showlegend=False
         )
         st.plotly_chart(fig_sup, use_container_width=True)
     else:
@@ -353,6 +366,10 @@ def show_dashboard():
     
     df_compare = pd.concat([agg_masuk, agg_keluar])
     if not df_compare.empty and df_compare['qty'].abs().sum() > 0:
+        # Limit max 25 barang paling aktif
+        top_active_items = df_compare.groupby('nama_barang')['qty'].apply(lambda x: x.abs().sum()).sort_values(ascending=False).head(25).index
+        df_compare = df_compare[df_compare['nama_barang'].isin(top_active_items)]
+        
         df_compare['qty_abs'] = df_compare['qty'].abs()
         fig_compare = px.bar(
             df_compare,
@@ -366,7 +383,7 @@ def show_dashboard():
         fig_compare.update_traces(texttemplate='%{text:,.0f}', textposition='auto')
         fig_compare.update_layout(
             margin=dict(t=10, b=0, l=0, r=0), 
-            xaxis_title="Nama Barang", 
+            xaxis_title="Nama Barang (Top 25)", 
             yaxis_title="Total Qty (Masuk = Positif, Keluar = Negatif)"
         )
         st.plotly_chart(fig_compare, use_container_width=True)

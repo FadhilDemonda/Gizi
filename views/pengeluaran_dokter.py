@@ -80,11 +80,16 @@ def pilih_dokter_dialog(df_docs, state_doc_key, kategori):
     
     if kategori == "Dokter Praktek" and not df_docs.empty and 'spesialis' in df_docs.columns:
         spesialis_list = sorted(list(set([str(s).strip().title() for s in df_docs['spesialis'].dropna().tolist() if str(s).strip()])))
-        spesialis_opts = ["Semua Spesialis"] + spesialis_list
-        selected_spes = st.selectbox("Filter Spesialis:", spesialis_opts, label_visibility="collapsed")
+        selected_spes = st.multiselect(
+            "Filter Spesialis:", 
+            options=spesialis_list, 
+            default=[], 
+            placeholder="Semua Spesialis (atau pilih beberapa spesialis)...", 
+            label_visibility="collapsed"
+        )
         
-        if selected_spes != "Semua Spesialis":
-            filtered_df = df_docs[df_docs['spesialis'].astype(str).str.strip().str.title() == selected_spes]
+        if selected_spes:
+            filtered_df = df_docs[df_docs['spesialis'].astype(str).str.strip().str.title().isin(selected_spes)]
         else:
             filtered_df = df_docs
     else:
