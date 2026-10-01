@@ -260,27 +260,22 @@ def show_transaksi():
                 # Notifikasi instan harga naik / turun / sama (di sebelah kiri sisa stok)
                 selisih_harga = harga_real - harga_master
                 if selisih_harga > 0:
-                    pct = (selisih_harga / harga_master * 100) if harga_master > 0 else 0
                     st.markdown(f"""
-                        <div style="background-color: #fee2e2; border: 1px solid #f87171; color: #991b1b; padding: 6px 8px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 700; line-height: 1.2;">
-                            🔺 Naik +Rp {selisih_harga:,.0f}
-                            <div style="font-size: 10px; font-weight: 600; color: #b91c1c; margin-top: 2px;">(+{pct:.1f}% dr HPP)</div>
+                        <div style="background-color: #fee2e2; border: 1px solid #f87171; color: #991b1b; padding: 7px 10px; border-radius: 8px; text-align: center; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; height: 38px;" title="Harga naik +Rp {selisih_harga:,.0f} dari HPP">
+                            🔺 Naik
                         </div>
                     """, unsafe_allow_html=True)
                 elif selisih_harga < 0:
                     selisih_abs = abs(selisih_harga)
-                    pct = (selisih_abs / harga_master * 100) if harga_master > 0 else 0
                     st.markdown(f"""
-                        <div style="background-color: #dcfce7; border: 1px solid #4ade80; color: #166534; padding: 6px 8px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 700; line-height: 1.2;">
-                            🔻 Turun -Rp {selisih_abs:,.0f}
-                            <div style="font-size: 10px; font-weight: 600; color: #15803d; margin-top: 2px;">(-{pct:.1f}% dr HPP)</div>
+                        <div style="background-color: #dcfce7; border: 1px solid #4ade80; color: #166534; padding: 7px 10px; border-radius: 8px; text-align: center; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; height: 38px;" title="Harga turun -Rp {selisih_abs:,.0f} dari HPP">
+                            🔻 Turun
                         </div>
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown(f"""
-                        <div style="background-color: #f3f4f6; border: 1px solid #d1d5db; color: #4b5563; padding: 6px 8px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 700; line-height: 1.2;">
-                            ⚖️ Sama Sesuai HPP
-                            <div style="font-size: 10px; font-weight: 500; color: #6b7280; margin-top: 2px;">Harga Normal</div>
+                        <div style="background-color: #f3f4f6; border: 1px solid #d1d5db; color: #4b5563; padding: 7px 10px; border-radius: 8px; text-align: center; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; height: 38px;" title="Harga sama sesuai HPP Master">
+                            ⚖️ Sama
                         </div>
                     """, unsafe_allow_html=True)
 
