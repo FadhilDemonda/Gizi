@@ -7,7 +7,7 @@ from data.sheets_repository import (
 from views.pengeluaran_common import show_toast, multi_select_dialog
 
 @st.dialog("Konfirmasi Penyimpanan Massal 📦")
-def confirm_batch_save_dialog(valid_rows_to_save, sheet_name, shift, kategori, master_df, toast_key):
+def confirm_batch_save_dialog(valid_rows_to_save, sheet_name, shift, kategori, master_df, toast_key, tgl_transaksi=None):
     jml_barang = sum(r['qty'] for r in valid_rows_to_save)
     dokters = set(r['kategori_freetext'] for r in valid_rows_to_save)
     jml_dokter = len(dokters)
@@ -38,6 +38,7 @@ def confirm_batch_save_dialog(valid_rows_to_save, sheet_name, shift, kategori, m
             with st.spinner("Menyimpan..."):
                 try:
                     now = datetime.datetime.now()
+                    timestamp = datetime.datetime.combine(tgl_transaksi, now.time()).strftime("%Y-%m-%d %H:%M:%S") if tgl_transaksi else now.strftime("%Y-%m-%d %H:%M:%S")
                     trx_df = get_sheet_data(sheet_name)
                     new_rows = []
                     master_df_updated = master_df.copy()
@@ -47,7 +48,7 @@ def confirm_batch_save_dialog(valid_rows_to_save, sheet_name, shift, kategori, m
                         master_df_updated.at[idx, 'stok_sekarang'] = master_df_updated.at[idx, 'stok_sekarang'] - r['qty']
                         
                         new_rows.append({
-                            "tanggal": now.strftime("%Y-%m-%d %H:%M:%S"),
+                            "tanggal": timestamp,
                             "shift": shift,
                             "kategori": kategori,
                             "kategori_freetext": r['kategori_freetext'],
@@ -138,7 +139,12 @@ def pilih_dokter_dialog(df_docs, state_doc_key, kategori):
         st.rerun()
 
 def show_pengeluaran_dokter():
-    st.title("🩺 Pengeluaran Dokter")
+    col_title, col_date = st.columns([2.8, 1.4])
+    with col_title:
+        st.title("🩺 Pengeluaran Dokter")
+    with col_date:
+        st.markdown('<span class="timestamp-blue-marker"></span>', unsafe_allow_html=True)
+        tgl_transaksi = st.date_input("📅 Tanggal Transaksi", value=datetime.date.today(), key="tgl_trx_dokter")
     
     master_df = get_sheet_data(SHEET_MASTER)
     if master_df.empty:
@@ -301,7 +307,7 @@ def show_pengeluaran_dokter():
                 if any(r['is_error'] for r in valid_rows_to_save):
                     st.error("Silakan perbaiki stok barang yang merah (tidak cukup) terlebih dahulu!")
                     return
-                confirm_batch_save_dialog(valid_rows_to_save, SHEET_PENGELUARAN_DOKTER, shift, kategori, master_df, toast_key)
+                confirm_batch_save_dialog(valid_rows_to_save, SHEET_PENGELUARAN_DOKTER, shift, kategori, master_df, toast_key, tgl_transaksi=tgl_transaksi)
                 
         else:
             # DYNAMIC ROWS UI FOR DR EDI / LAINNYA
@@ -460,7 +466,7 @@ def show_pengeluaran_dokter():
                         new_rows = []
                         master_df_updated = master_df.copy()
                         
-                        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        timestamp = datetime.datetime.combine(tgl_transaksi, datetime.datetime.now().time()).strftime("%Y-%m-%d %H:%M:%S")
                         
                         for r in row_data:
                             idx = master_df_updated.index[master_df_updated['nama_barang'] == r['nama_barang']].tolist()[0]

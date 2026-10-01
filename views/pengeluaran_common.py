@@ -6,7 +6,6 @@ from data.sheets_repository import (
     get_sheet_data, save_data, SHEET_MASTER, 
     SHEET_PENGELUARAN_PASIEN, SHEET_PENGELUARAN_DOKTER, SHEET_PENGELUARAN_MANAJEMEN
 )
-from views.dialog_tambah_barang import dialog_tambah_barang
 
 def show_toast(message, icon="✅", color="#22c55e"):
     """Tampilkan toast notification di pojok kanan atas seperti alert web."""
@@ -134,7 +133,9 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
             del st.session_state['dialog_sel_items_set']
         st.rerun()
 
-def render_form(tab_name, sheet_name, categories):
+def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
+    if tgl_transaksi is None:
+        tgl_transaksi = datetime.date.today()
     # Tampilkan toast notifikasi jika ada pesan sukses dari submit sebelumnya
     toast_key = f'toast_msg_{tab_name}'
     if toast_key in st.session_state:
@@ -388,7 +389,7 @@ def render_form(tab_name, sheet_name, categories):
                 })
             
         # Add Item Button
-        btn_col1, btn_col2, btn_col3, btn_col4 = st.columns([1.3, 1.4, 1.4, 1.1])
+        btn_col1, btn_col2, btn_col3, _ = st.columns([1.5, 1.5, 1.5, 0.5])
         with btn_col1:
             st.button("➕ Tambah 1 Baris Kosong", on_click=add_row, key=f"add_{tab_name}", use_container_width=True)
         with btn_col2:
@@ -402,9 +403,6 @@ def render_form(tab_name, sheet_name, categories):
                         current_items_in_form.append(item_val)
                 multi_select_dialog(master_df, state_items_key, state_defaults_key, current_items_in_form)
         with btn_col3:
-            if st.button("📦 Tambah Barang Baru", key=f"new_item_{tab_name}", use_container_width=True):
-                dialog_tambah_barang(state_items_key, state_defaults_key, toast_key=toast_key)
-        with btn_col4:
             st.markdown('<span class="btn-clear-target"></span>', unsafe_allow_html=True)
             st.button("🗑️ Bersihkan Semua", on_click=clear_all, key=f"clear_all_{tab_name}", use_container_width=True)
         
@@ -459,8 +457,9 @@ def render_form(tab_name, sheet_name, categories):
                         stok_baru = master_df_updated.at[idx, 'stok_sekarang'] - r['qty']
                         master_df_updated.at[idx, 'stok_sekarang'] = stok_baru
                         
+                        timestamp = datetime.datetime.combine(tgl_transaksi, now.time()).strftime("%Y-%m-%d %H:%M:%S")
                         row_dict = {
-                            "tanggal": now.strftime("%Y-%m-%d %H:%M:%S"),
+                            "tanggal": timestamp,
                             "shift": shift,
                             "kategori": kategori,
                             "kategori_freetext": freetext_val,

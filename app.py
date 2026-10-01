@@ -28,16 +28,18 @@ init_session_state()
 
 def main():
     if os.path.exists(LOGO_PATH):
-        c_l1, c_l2, c_l3 = st.sidebar.columns([1, 2, 1])
-        with c_l2:
+        col_logo, col_txt = st.sidebar.columns([1, 3.2], vertical_alignment="center")
+        with col_logo:
             st.image(LOGO_PATH, use_container_width=True)
-        st.sidebar.markdown(
-            "<div style='text-align: center; margin-top: -6px; margin-bottom: 14px;'>"
-            "<h2 style='margin: 0; font-size: 1.35rem; font-weight: 700;'>Stok Gizi</h2>"
-            "<span style='font-size: 0.82rem; opacity: 0.8;'>RS An-Nisa Tangerang</span>"
-            "</div>",
-            unsafe_allow_html=True
-        )
+        with col_txt:
+            st.markdown(
+                "<div style='margin-left: -4px;'>"
+                "<h2 style='margin: 0; font-size: 1.35rem; font-weight: 700; line-height: 1.15;'>Stok Gizi</h2>"
+                "<span style='font-size: 0.8rem; opacity: 0.75;'>RS An-Nisa Tangerang</span>"
+                "</div>",
+                unsafe_allow_html=True
+            )
+        st.sidebar.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
     else:
         st.sidebar.title("📦 Stok-Gizi")
         st.sidebar.markdown("Aplikasi Manajemen Stok Makanan")

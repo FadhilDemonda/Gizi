@@ -5,10 +5,14 @@ from data.sheets_repository import (
     get_sheet_data, save_data, SHEET_MASTER, SHEET_PENGELUARAN_PASIEN
 )
 from views.pengeluaran_common import show_toast, multi_select_dialog
-from views.dialog_tambah_barang import dialog_tambah_barang
 
 def show_pengeluaran_pasien():
-    st.title("🛏️ Pengeluaran Pasien")
+    col_title, col_date = st.columns([2.8, 1.4])
+    with col_title:
+        st.title("🛏️ Pengeluaran Pasien")
+    with col_date:
+        st.markdown('<span class="timestamp-blue-marker"></span>', unsafe_allow_html=True)
+        tgl_transaksi = st.date_input("📅 Tanggal Transaksi", value=datetime.date.today(), key="tgl_trx_pasien")
     # st.info("💡 **Petunjuk:** Anda bisa memilih lebih dari satu kelas sekaligus. Jika memilih banyak kelas, pengeluaran bahan akan dibagi secara otomatis & proporsional berdasarkan jumlah pasien per kelas.")
     
     sheet_name = SHEET_PENGELUARAN_PASIEN
@@ -141,7 +145,7 @@ def show_pengeluaran_pasien():
                 })
         
         # Tombol tambah barang
-        btn_col1, btn_col2, btn_col3, btn_col4 = st.columns([1.3, 1.4, 1.4, 1.1])
+        btn_col1, btn_col2, btn_col3, _ = st.columns([1.5, 1.5, 1.5, 0.5])
         with btn_col1:
             st.button("➕ Tambah 1 Baris Kosong", on_click=add_row, key=f"add_{tab_name}", use_container_width=True)
         with btn_col2:
@@ -155,9 +159,6 @@ def show_pengeluaran_pasien():
                         current_items_in_form.append(item_val)
                 multi_select_dialog(master_df, state_items_key, state_defaults_key, current_items_in_form)
         with btn_col3:
-            if st.button("📦 Tambah Barang Baru", key=f"new_item_{tab_name}", use_container_width=True):
-                dialog_tambah_barang(state_items_key, state_defaults_key, toast_key=toast_key)
-        with btn_col4:
             st.markdown('<span class="btn-clear-target"></span>', unsafe_allow_html=True)
             st.button("🗑️ Bersihkan Semua", on_click=clear_all, key=f"clear_all_{tab_name}", use_container_width=True)
         
@@ -190,7 +191,7 @@ def show_pengeluaran_pasien():
                     new_rows = []
                     master_df_updated = master_df.copy()
                     
-                    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+                    timestamp = datetime.datetime.combine(tgl_transaksi, now.time()).strftime("%Y-%m-%d %H:%M:%S")
                     
                     for r in row_data:
                         # Potong stok master

@@ -86,6 +86,35 @@ def inject_custom_css():
             height: 0 !important;
         }
 
+        /* Timestamp Badge / Box dengan Latar Belakang Biru */
+        div[data-testid="column"]:has(.timestamp-blue-marker) {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+            border: 1.5px solid #93c5fd !important;
+            border-radius: 12px !important;
+            padding: 8px 14px 10px 14px !important;
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.08) !important;
+            margin-top: 4px !important;
+        }
+        div[data-testid="column"]:has(.timestamp-blue-marker) label {
+            color: #1e40af !important;
+            font-weight: 700 !important;
+            font-size: 0.85rem !important;
+            margin-bottom: 2px !important;
+        }
+        div[data-testid="column"]:has(.timestamp-blue-marker) div[data-baseweb="input"] {
+            background-color: #ffffff !important;
+            border: 1px solid #bfdbfe !important;
+            border-radius: 8px !important;
+            color: #1e3a8a !important;
+            font-weight: 600 !important;
+        }
+        div[data-testid="stElementContainer"]:has(.timestamp-blue-marker) {
+            display: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 0 !important;
+        }
+
         /* Input Fields Styling */
         div[data-baseweb="input"], div[data-baseweb="select"], div[data-baseweb="base-input"] {
             border-radius: 8px !important;

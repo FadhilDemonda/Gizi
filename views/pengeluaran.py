@@ -7,11 +7,17 @@ Kode logika sudah dipecah ke:
 """
 
 import streamlit as st
+import datetime
 from data.sheets_repository import SHEET_PENGELUARAN_MANAJEMEN
 from views.pengeluaran_common import render_form
 from views.pengeluaran_pasien import show_pengeluaran_pasien
 from views.pengeluaran_dokter import show_pengeluaran_dokter
 
 def show_pengeluaran_manajemen():
-    st.title("🏢 Pengeluaran Manajemen")
-    render_form("Manajemen", SHEET_PENGELUARAN_MANAJEMEN, ["PT", "Rapat Direksi", "Tamu VIP", "Staff", "Event RS", "Skrining", "Scuba", "Lainnya"])
+    col_title, col_date = st.columns([2.8, 1.4])
+    with col_title:
+        st.title("🏢 Pengeluaran Manajemen")
+    with col_date:
+        st.markdown('<span class="timestamp-blue-marker"></span>', unsafe_allow_html=True)
+        tgl_transaksi = st.date_input("📅 Tanggal Transaksi", value=datetime.date.today(), key="tgl_trx_manajemen")
+    render_form("Manajemen", SHEET_PENGELUARAN_MANAJEMEN, ["PT", "Rapat Direksi", "Tamu VIP", "Staff", "Event RS", "Skrining", "Scuba", "Lainnya"], tgl_transaksi=tgl_transaksi)

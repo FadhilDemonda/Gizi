@@ -3,7 +3,6 @@ import datetime
 import pandas as pd
 import time
 from data.sheets_repository import get_sheet_data, save_data, SHEET_MASTER, SHEET_STOK_MASUK
-from views.dialog_tambah_barang import dialog_tambah_barang
 
 def show_toast(message, icon="✅", color="#22c55e"):
     """Tampilkan toast notification di pojok kanan atas seperti alert web."""
@@ -149,7 +148,12 @@ def show_transaksi():
         </style>
     """, unsafe_allow_html=True)
     
-    st.title("📥 Input Stok Masuk (Belanja)")
+    col_title, col_date = st.columns([2.8, 1.4])
+    with col_title:
+        st.title("📥 Input Stok Masuk (Belanja)")
+    with col_date:
+        st.markdown('<span class="timestamp-blue-marker"></span>', unsafe_allow_html=True)
+        tgl_transaksi = st.date_input("📅 Tanggal Transaksi", value=datetime.date.today(), key="tgl_trx_masuk")
     
     toast_key = 'toast_msg_masuk'
     if toast_key in st.session_state:
@@ -267,7 +271,7 @@ def show_transaksi():
             })
             
         # Add Item Button
-        btn_col1, btn_col2, btn_col3, btn_col4 = st.columns([1.3, 1.4, 1.4, 1.1])
+        btn_col1, btn_col2, btn_col3, _ = st.columns([1.5, 1.5, 1.5, 0.5])
         with btn_col1:
             st.button("➕ Tambah 1 Baris Kosong", on_click=add_row, key="add_masuk", use_container_width=True)
         with btn_col2:
@@ -281,9 +285,6 @@ def show_transaksi():
                         current_items_in_form.append(item_val)
                 multi_select_dialog(master_df, state_items_key, state_defaults_key, current_items_in_form)
         with btn_col3:
-            if st.button("📦 Tambah Barang Baru", key="new_item_masuk", use_container_width=True):
-                dialog_tambah_barang(state_items_key, state_defaults_key, toast_key=toast_key)
-        with btn_col4:
             st.markdown('<span class="btn-clear-target"></span>', unsafe_allow_html=True)
             st.button("🗑️ Bersihkan Semua", on_click=clear_all, key="clear_all_masuk", use_container_width=True)
         
@@ -337,6 +338,8 @@ def show_transaksi():
                     # Update master df logic
                     master_df_updated = master_df.copy()
                     
+                    timestamp = datetime.datetime.combine(tgl_transaksi, now.time()).strftime("%Y-%m-%d %H:%M:%S")
+                    
                     for r in row_data:
                         idx = master_df_updated.index[master_df_updated['nama_barang'] == r['nama_barang']].tolist()[0]
                         
@@ -344,7 +347,7 @@ def show_transaksi():
                         if r['harga_real'] > 0 and r['harga_real'] != r['harga_master']:
                             master_df_updated.at[idx, 'harga_master'] = r['harga_real']
                             new_crud_logs.append({
-                                "tanggal": now.strftime("%Y-%m-%d %H:%M:%S"),
+                                "tanggal": timestamp,
                                 "kategori": "Update HPP Master",
                                 "kategori_freetext": "Sistem (Otomatis)",
                                 "nama_barang": r['nama_barang'],
@@ -357,7 +360,7 @@ def show_transaksi():
                         
                         # 1. Log Stok Masuk
                         new_masuk_rows.append({
-                            "tanggal": now.strftime("%Y-%m-%d %H:%M:%S"),
+                            "tanggal": timestamp,
                             "shift": shift,
                             "kategori": "Penerimaan Barang",
                             "petugas": petugas,
