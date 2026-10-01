@@ -18,18 +18,77 @@ def safe_str(val):
         return ""
     return str(val).strip()
 
+def find_matching_items(available_items, target_items):
+    valid_items = []
+    for ti in target_items:
+        ti_clean = ti.lower().strip()
+        match = None
+        for item in available_items:
+            if str(item).lower().strip() == ti_clean:
+                match = item
+                break
+        if not match:
+            for item in available_items:
+                if str(item).lower().strip().startswith(ti_clean):
+                    match = item
+                    break
+        if not match:
+            for item in available_items:
+                if ti_clean in str(item).lower().strip():
+                    match = item
+                    break
+        if match and match not in valid_items:
+            valid_items.append(match)
+    return valid_items
+
 def show_master_barang():
     st.header("📦 Master Barang")
     
     master_df, _ = load_data()
     
+    if 'status' not in master_df.columns:
+        master_df['status'] = True
+    else:
+        # Normalize to boolean for the editor
+        master_df['status'] = master_df['status'].astype(str).str.upper().isin(['TRUE', '1', 'YES', 'T'])
+        
+    # Filter Kategori / Filter Cepat (Mirip Dashboard Utama)
+    if 'kategori' in master_df.columns:
+        categories = master_df['kategori'].dropna().unique().tolist()
+        categories = [c for c in categories if str(c).strip() != '']
+    else:
+        categories = []
+
+    available_items = master_df['nama_barang'].tolist() if 'nama_barang' in master_df.columns else []
+    cat_options = [f"Semua ({len(master_df)})", "Khusus Dokter", "Khusus Manajemen"]
+    for c in categories:
+        count = len(master_df[master_df['kategori'] == c])
+        cat_options.append(f"{c} ({count})")
+
+    selected_cat = st.pills("KATEGORI / FILTER CEPAT:", cat_options, default=cat_options[0], key="master_cat_pills")
+
+    if selected_cat == "Khusus Dokter":
+        target_items = ["Roti", "Buah (Dokter)", "Telur Rebus", "Snack (Dokter)", "Le Minerale 600 ml", "Kopi KA", "Kopi 3 in 1", "Pocari", "Buavita", "Teh", "Oxy", "Buah (Dr Edi)", "Snack (Dr Edi)", "tempe goreng", "gula DM", "Teh (ok)", "pop mie"]
+        valid_items = find_matching_items(available_items, target_items)
+        df_to_edit = master_df[master_df['nama_barang'].isin(valid_items)].copy()
+    elif selected_cat == "Khusus Manajemen":
+        target_items = ["Le Mineral 330", "Snack", "Roti", "Jus", "Cleo", "Buah (Dokter)"]
+        valid_items = find_matching_items(available_items, target_items)
+        df_to_edit = master_df[master_df['nama_barang'].isin(valid_items)].copy()
+    elif selected_cat and not selected_cat.startswith("Semua"):
+        real_cat = selected_cat.split(" (")[0]
+        df_to_edit = master_df[master_df['kategori'] == real_cat].copy()
+    else:
+        df_to_edit = master_df.copy()
+
     col_head, col_exp = st.columns([3, 1])
     with col_head:
         st.subheader("Daftar Barang (CRUD)")
     with col_exp:
-        csv_data = master_df.to_csv(index=False).encode('utf-8')
+        csv_data = df_to_edit.to_csv(index=False).encode('utf-8')
+        export_label = f"📥 Export ke CSV ({len(df_to_edit)})" if len(df_to_edit) != len(master_df) else "📥 Export ke CSV"
         st.download_button(
-            label="📥 Export ke CSV",
+            label=export_label,
             data=csv_data,
             file_name=f"master_barang_{datetime.today().strftime('%Y%m%d')}.csv",
             mime="text/csv",
@@ -38,18 +97,12 @@ def show_master_barang():
         
     st.info("💡 **Tips CRUD:** Anda bisa mengubah isi langsung di dalam sel tabel. Untuk menghapus baris, klik kolom paling kiri dari baris tersebut dan tekan tombol `Delete` di *keyboard* Anda. Anda juga bisa menambah baris di bagian paling bawah tabel.")
     
-    if 'status' not in master_df.columns:
-        master_df['status'] = True
-    else:
-        # Normalize to boolean for the editor
-        master_df['status'] = master_df['status'].astype(str).str.upper().isin(['TRUE', '1', 'YES', 'T'])
-        
     edited_df = st.data_editor(
-        master_df, 
+        df_to_edit, 
         use_container_width=True,
         hide_index=True,
         num_rows="dynamic",
-        key="master_editor",
+        key=f"master_editor_{selected_cat}",
         column_config={
             "kategori": st.column_config.SelectboxColumn(
                 "Kategori",
@@ -64,20 +117,27 @@ def show_master_barang():
         }
     )
     
-    if not master_df.equals(edited_df):
+    if not df_to_edit.equals(edited_df):
         if st.button("💾 Simpan Perubahan ke Database", type="primary", key="save_master_barang"):
             is_valid, error_msg = validate_editor_changes(edited_df)
             if not is_valid:
                 st.error(error_msg)
             else:
                 with st.spinner("Menyimpan dan mensinkronisasi data ke Cloud..."):
+                    full_master_df, _ = load_data()
                     _, transaksi_df = load_data()
+                    
+                    if 'status' not in full_master_df.columns:
+                        full_master_df['status'] = True
+                    else:
+                        full_master_df['status'] = full_master_df['status'].astype(str).str.upper().isin(['TRUE', '1', 'YES', 'T'])
+                        
                     new_trx_list = []
                     
                     for _, row in edited_df.iterrows():
                         kode = row['kode_barang']
-                        if kode in master_df['kode_barang'].values:
-                            old_row = master_df[master_df['kode_barang'] == kode].iloc[0]
+                        if kode in full_master_df['kode_barang'].values:
+                            old_row = full_master_df[full_master_df['kode_barang'] == kode].iloc[0]
                             
                             stok_new = safe_float(row.get('stok_sekarang', 0))
                             stok_old = safe_float(old_row.get('stok_sekarang', 0))
@@ -110,6 +170,11 @@ def show_master_barang():
                                     "nama_barang": row['nama_barang'],
                                     "keterangan": f"CRUD Update: {' | '.join(changes)}"
                                 })
+                            # Update existing row in full_master_df
+                            idx = full_master_df.index[full_master_df['kode_barang'] == kode][0]
+                            for col in edited_df.columns:
+                                if col in full_master_df.columns:
+                                    full_master_df.at[idx, col] = row[col]
                         else:
                             new_trx_list.append({
                                 "tanggal": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -118,9 +183,13 @@ def show_master_barang():
                                 "nama_barang": row['nama_barang'],
                                 "keterangan": "CRUD Insert: Barang baru ditambahkan"
                             })
+                            full_master_df = pd.concat([full_master_df, pd.DataFrame([row])], ignore_index=True)
                             
-                    for _, old_row in master_df.iterrows():
+                    # Check deletions ONLY within the items that were in df_to_edit
+                    deleted_kodes = []
+                    for _, old_row in df_to_edit.iterrows():
                         if old_row['kode_barang'] not in edited_df['kode_barang'].values:
+                            deleted_kodes.append(old_row['kode_barang'])
                             new_trx_list.append({
                                 "tanggal": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                 "kategori": "Delete Master",
@@ -128,13 +197,15 @@ def show_master_barang():
                                 "nama_barang": old_row['nama_barang'],
                                 "keterangan": "CRUD Delete: Barang dihapus dari sistem"
                             })
+                    if deleted_kodes:
+                        full_master_df = full_master_df[~full_master_df['kode_barang'].isin(deleted_kodes)]
                             
                     if new_trx_list:
                         new_trx_df = pd.DataFrame(new_trx_list)
                         transaksi_df = pd.concat([transaksi_df, new_trx_df], ignore_index=True)
                         save_data(transaksi_df, TRANSAKSI_CSV)
                         
-                    save_data(edited_df, MASTER_CSV)
+                    save_data(full_master_df, MASTER_CSV)
                 
                 st.success("✅ Perubahan berhasil disimpan dan log transaksi tercatat!")
                 time.sleep(1)

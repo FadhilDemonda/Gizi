@@ -56,6 +56,36 @@ def inject_custom_css():
             box-shadow: 0 6px 15px rgba(0,0,0,0.15) !important;
         }
 
+        /* Tombol Bersihkan Semua (Yellow Accent) */
+        div[data-testid="column"]:has(.btn-clear-target, #btn-bersihkan) button,
+        div[data-testid="stElementContainer"]:has(.btn-clear-target, #btn-bersihkan) + div[data-testid="stElementContainer"] button {
+            background-color: #facc15 !important;
+            color: #000000 !important;
+            border: 1px solid #eab308 !important;
+            font-weight: 700 !important;
+        }
+        div[data-testid="column"]:has(.btn-clear-target, #btn-bersihkan) button p,
+        div[data-testid="column"]:has(.btn-clear-target, #btn-bersihkan) button span,
+        div[data-testid="stElementContainer"]:has(.btn-clear-target, #btn-bersihkan) + div[data-testid="stElementContainer"] button p,
+        div[data-testid="stElementContainer"]:has(.btn-clear-target, #btn-bersihkan) + div[data-testid="stElementContainer"] button span {
+            color: #000000 !important;
+            font-weight: 700 !important;
+        }
+        div[data-testid="column"]:has(.btn-clear-target, #btn-bersihkan) button:hover,
+        div[data-testid="stElementContainer"]:has(.btn-clear-target, #btn-bersihkan) + div[data-testid="stElementContainer"] button:hover {
+            background-color: #eab308 !important;
+            border-color: #ca8a04 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 12px rgba(234, 179, 8, 0.35) !important;
+        }
+        /* Sembunyikan elemen penanda agar tidak memakan ruang layout */
+        div[data-testid="stElementContainer"]:has(.btn-clear-target, #btn-bersihkan) {
+            display: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 0 !important;
+        }
+
         /* Input Fields Styling */
         div[data-baseweb="input"], div[data-baseweb="select"], div[data-baseweb="base-input"] {
             border-radius: 8px !important;

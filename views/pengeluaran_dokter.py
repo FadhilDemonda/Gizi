@@ -429,6 +429,7 @@ def show_pengeluaran_dokter():
                             current_items_in_form.append(item_val)
                     multi_select_dialog(master_df, state_items_key, state_defaults_key, current_items_in_form)
             with btn_col3:
+                st.markdown('<span class="btn-clear-target"></span>', unsafe_allow_html=True)
                 st.button("🗑️ Bersihkan Semua", on_click=clear_all, key=f"clear_all_{tab_name}", use_container_width=True)
             
             st.divider()

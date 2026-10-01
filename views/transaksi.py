@@ -241,7 +241,8 @@ def show_transaksi():
                 st.text_input("HPP", value=f"Rp {harga_master:,.0f}", disabled=True, key=f"hpp_masuk_{row_id}_{selected_item}", label_visibility="collapsed")
                 
             with c4:
-                harga_real = st.number_input("Harga Beli", min_value=0.0, value=harga_master, step=100.0, key=f"real_masuk_{row_id}_{selected_item}", label_visibility="collapsed")
+                harga_real = st.number_input("Harga Beli", min_value=0, value=int(harga_master), step=100, format="%d", key=f"real_masuk_{row_id}_{selected_item}", label_visibility="collapsed")
+                st.markdown(f"<div style='font-size: 11px; color: gray; text-align: left; margin-top: -10px; margin-bottom: 5px; padding-left: 2px;'>Rp {harga_real:,.0f}</div>", unsafe_allow_html=True)
                 
             with c5:
                 # Show current stock
@@ -274,6 +275,7 @@ def show_transaksi():
                         current_items_in_form.append(item_val)
                 multi_select_dialog(master_df, state_items_key, state_defaults_key, current_items_in_form)
         with btn_col3:
+            st.markdown('<span class="btn-clear-target"></span>', unsafe_allow_html=True)
             st.button("🗑️ Bersihkan Semua", on_click=clear_all, key="clear_all_masuk", use_container_width=True)
         
         st.divider()

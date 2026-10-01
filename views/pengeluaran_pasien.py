@@ -8,7 +8,7 @@ from views.pengeluaran_common import show_toast, multi_select_dialog
 
 def show_pengeluaran_pasien():
     st.title("🛏️ Pengeluaran Pasien")
-    st.info("💡 **Petunjuk:** Anda bisa memilih lebih dari satu kelas sekaligus. Jika memilih banyak kelas, pengeluaran bahan akan dibagi secara otomatis & proporsional berdasarkan jumlah pasien per kelas.")
+    # st.info("💡 **Petunjuk:** Anda bisa memilih lebih dari satu kelas sekaligus. Jika memilih banyak kelas, pengeluaran bahan akan dibagi secara otomatis & proporsional berdasarkan jumlah pasien per kelas.")
     
     sheet_name = SHEET_PENGELUARAN_PASIEN
     toast_key = 'toast_msg_Pasien'
@@ -154,6 +154,7 @@ def show_pengeluaran_pasien():
                         current_items_in_form.append(item_val)
                 multi_select_dialog(master_df, state_items_key, state_defaults_key, current_items_in_form)
         with btn_col3:
+            st.markdown('<span class="btn-clear-target"></span>', unsafe_allow_html=True)
             st.button("🗑️ Bersihkan Semua", on_click=clear_all, key=f"clear_all_{tab_name}", use_container_width=True)
         
         st.divider()

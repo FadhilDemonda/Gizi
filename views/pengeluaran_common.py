@@ -360,7 +360,8 @@ def render_form(tab_name, sheet_name, categories):
                     st.text_input("HPP", value=f"Rp {harga_master:,.0f}", disabled=True, key=f"hpp_{tab_name}_{cat_key}_{rc}_{row_id}_{selected_item}", label_visibility="collapsed")
                     
                 with c4:
-                    harga_real = st.number_input("Harga Real", min_value=0.0, value=harga_master, step=100.0, key=f"real_{tab_name}_{cat_key}_{rc}_{row_id}_{selected_item}", label_visibility="collapsed")
+                    harga_real = st.number_input("Harga Real", min_value=0, value=int(harga_master), step=100, format="%d", key=f"real_{tab_name}_{cat_key}_{rc}_{row_id}_{selected_item}", label_visibility="collapsed")
+                    st.markdown(f"<div style='font-size: 11px; color: gray; text-align: left; margin-top: -10px; margin-bottom: 5px; padding-left: 2px;'>Rp {harga_real:,.0f}</div>", unsafe_allow_html=True)
                     
                 with c5:
                     keterangan = st.text_input("Ket", placeholder="Catatan...", key=f"ket_{tab_name}_{cat_key}_{rc}_{row_id}", label_visibility="collapsed")
@@ -400,6 +401,7 @@ def render_form(tab_name, sheet_name, categories):
                         current_items_in_form.append(item_val)
                 multi_select_dialog(master_df, state_items_key, state_defaults_key, current_items_in_form)
         with btn_col3:
+            st.markdown('<span class="btn-clear-target"></span>', unsafe_allow_html=True)
             st.button("🗑️ Bersihkan Semua", on_click=clear_all, key=f"clear_all_{tab_name}", use_container_width=True)
         
         st.divider()
