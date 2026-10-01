@@ -310,7 +310,7 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
         for i, row_id in enumerate(st.session_state[state_items_key]):
             
             # Determine default index if this is a pre-filled row
-            default_idx = 0
+            default_idx = None
             if state_defaults_key in st.session_state and i < len(st.session_state[state_defaults_key]):
                 def_val = st.session_state[state_defaults_key][i]
                 if def_val in item_options:
@@ -319,7 +319,18 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
             if tab_name == "Pasien":
                 c1, c2, c_sat, c5, c6 = st.columns([3, 1.5, 1.5, 2, 0.5])
                 with c1:
-                    selected_item = st.selectbox("Barang", item_options, index=default_idx, key=f"item_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                    selected_item = st.selectbox("Barang", item_options, index=default_idx, placeholder="-- Pilih Barang --", key=f"item_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                
+                if not selected_item:
+                    with c2:
+                        st.number_input("Qty", value=0.0, disabled=True, key=f"qty_dis_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                    with c_sat:
+                        st.text_input("Satuan", value="-", disabled=True, key=f"sat_dis_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                    with c5:
+                        st.text_input("Ket", placeholder="Catatan...", disabled=True, key=f"ket_dis_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                    with c6:
+                        st.button("🗑️", key=f"del_{tab_name}_{rc}_{row_id}", on_click=remove_row, args=(row_id,))
+                    continue
                 
                 item_data = master_df[master_df['nama_barang'] == selected_item].iloc[0]
                 stok_fisik = float(item_data.get('stok_sekarang', 0))
@@ -347,8 +358,21 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
                 cat_key = current_kategori if tab_name == "Dokter" else ""
                 c1, c2, c3, c4, c5, c6 = st.columns([2.5, 1.5, 1.5, 1.5, 2, 0.5])
                 with c1:
-                    selected_item = st.selectbox("Barang", item_options, index=default_idx, key=f"item_{tab_name}_{cat_key}_{rc}_{row_id}", label_visibility="collapsed")
+                    selected_item = st.selectbox("Barang", item_options, index=default_idx, placeholder="-- Pilih Barang --", key=f"item_{tab_name}_{cat_key}_{rc}_{row_id}", label_visibility="collapsed")
                 
+                if not selected_item:
+                    with c2:
+                        st.number_input("Qty", value=0.0, disabled=True, key=f"qty_dis_{tab_name}_{cat_key}_{rc}_{row_id}", label_visibility="collapsed")
+                    with c3:
+                        st.text_input("HPP", value="-", disabled=True, key=f"hpp_dis_{tab_name}_{cat_key}_{rc}_{row_id}", label_visibility="collapsed")
+                    with c4:
+                        st.number_input("Harga Real", value=0, disabled=True, key=f"real_dis_{tab_name}_{cat_key}_{rc}_{row_id}", label_visibility="collapsed")
+                    with c5:
+                        st.text_input("Ket", placeholder="Catatan...", disabled=True, key=f"ket_dis_{tab_name}_{cat_key}_{rc}_{row_id}", label_visibility="collapsed")
+                    with c6:
+                        st.button("🗑️", key=f"del_{tab_name}_{cat_key}_{rc}_{row_id}", on_click=remove_row, args=(row_id,))
+                    continue
+
                 item_data = master_df[master_df['nama_barang'] == selected_item].iloc[0]
                 stok_fisik = float(item_data.get('stok_sekarang', 0))
                 harga_master = float(item_data.get('harga_master', 0))

@@ -109,6 +109,14 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
             if state_defaults_key not in st.session_state:
                 st.session_state[state_defaults_key] = []
             
+            # Jika form hanya punya 1 baris awal dan baris tsb belum memilih barang, gunakan baris pertama itu
+            if len(st.session_state[state_items_key]) == 1:
+                first_id = st.session_state[state_items_key][0]
+                first_val = st.session_state.get(f"item_masuk_{first_id}")
+                if not first_val and (not st.session_state[state_defaults_key] or not st.session_state[state_defaults_key][0]):
+                    st.session_state[state_defaults_key] = [items_to_add[0]]
+                    items_to_add = items_to_add[1:]
+
             while len(st.session_state[state_defaults_key]) < len(st.session_state[state_items_key]):
                 st.session_state[state_defaults_key].append(None)
                 
@@ -229,15 +237,38 @@ def show_transaksi():
         for i, row_id in enumerate(st.session_state[state_items_key]):
             c1, c2, c3, c4, c5, c6, c7 = st.columns([2.3, 1.0, 1.3, 1.3, 1.6, 1.2, 0.4])
             
-            default_idx = 0
+            default_idx = None
             if state_defaults_key in st.session_state and i < len(st.session_state[state_defaults_key]):
                 def_val = st.session_state[state_defaults_key][i]
                 if def_val in item_options:
                     default_idx = item_options.index(def_val)
                     
             with c1:
-                selected_item = st.selectbox("Barang", item_options, index=default_idx, key=f"item_masuk_{row_id}", label_visibility="collapsed")
+                selected_item = st.selectbox(
+                    "Barang", 
+                    item_options, 
+                    index=default_idx, 
+                    placeholder="-- Pilih Barang --", 
+                    key=f"item_masuk_{row_id}", 
+                    label_visibility="collapsed"
+                )
             
+            # Jika belum memilih barang (baris baru kosong)
+            if not selected_item:
+                with c2:
+                    st.number_input("Qty", min_value=0.0, value=0.0, disabled=True, key=f"qty_masuk_dis_{row_id}", label_visibility="collapsed")
+                with c3:
+                    st.text_input("HPP", value="-", disabled=True, key=f"hpp_masuk_dis_{row_id}", label_visibility="collapsed")
+                with c4:
+                    st.number_input("Harga Beli", value=0, disabled=True, key=f"real_masuk_dis_{row_id}", label_visibility="collapsed")
+                with c5:
+                    st.markdown("<div style='background-color: #f3f4f6; border: 1px dashed #d1d5db; color: #9ca3af; padding: 7px 10px; border-radius: 8px; text-align: center; font-size: 13px; font-weight: 500; display: flex; align-items: center; justify-content: center; height: 38px;'>-</div>", unsafe_allow_html=True)
+                with c6:
+                    st.info("-")
+                with c7:
+                    st.button("🗑️", key=f"del_masuk_{row_id}", on_click=remove_row, args=(row_id,))
+                continue
+
             # Get item data
             item_data = master_df[master_df['nama_barang'] == selected_item].iloc[0]
             stok_fisik = float(item_data.get('stok_sekarang', 0))
