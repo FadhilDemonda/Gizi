@@ -28,62 +28,6 @@ else:
 inject_custom_css()
 init_session_state()
 
-def get_maintenance_config():
-    """Membaca konfigurasi mode maintenance dari secrets atau session state"""
-    enabled = False
-    pin = "1234"
-    if "maintenance" in st.secrets:
-        enabled = bool(st.secrets["maintenance"].get("enabled", False))
-        pin = str(st.secrets["maintenance"].get("admin_pin", "1234"))
-    
-    # Session state dapat meng-override saat runtime jika admin mengubah switch
-    if "maintenance_active" in st.session_state:
-        enabled = st.session_state["maintenance_active"]
-        
-    return enabled, pin
-
-def show_maintenance_screen(admin_pin: str):
-    """Tampilan ramah saat aplikasi dalam mode pemeliharaan"""
-    st.markdown(
-        """
-        <div style="text-align: center; padding: 40px 24px; max-width: 680px; margin: 30px auto 20px auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);">
-            <div style="font-size: 50px; margin-bottom: 8px;">🛠️</div>
-            <h1 style="color: #1e3a8a; font-size: 1.8rem; font-weight: 800; margin-bottom: 6px;">
-                Sistem Dalam Pemeliharaan
-            </h1>
-            <p style="color: #0d9488; font-weight: 600; font-size: 1.05rem; margin-top: 0; margin-bottom: 20px;">
-                Rumah Sakit An-Nisa Tangerang
-            </p>
-            <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-left: 5px solid #3b82f6; border-radius: 10px; padding: 16px 20px; margin: 0 auto 20px auto; text-align: left;">
-                <p style="color: #1e40af; font-size: 14.5px; line-height: 1.6; margin: 0;">
-                    Aplikasi <b>Stok Gizi</b> sedang dalam pemeliharaan berkala dan optimalisasi sistem oleh <b>Tim DTO</b> untuk memastikan keamanan serta keakuratan data transaksi.
-                </p>
-                <p style="color: #1e40af; font-size: 14.5px; line-height: 1.6; margin: 8px 0 0 0;">
-                    Mohon menunggu beberapa saat dan silakan coba akses kembali secara berkala.
-                </p>
-            </div>
-            <p style="color: #64748b; font-size: 13.5px; margin-bottom: 0;">
-                Butuh bantuan darurat? Silakan <b>hubungi Tim DTO (Digital Transformation Office)</b>.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    
-    # Form login bypass untuk Admin / Penguji Sistem
-    col_l, col_center, col_r = st.columns([1, 1.6, 1])
-    with col_center:
-        with st.expander("🔑 Akses Khusus Admin / Penguji Sistem"):
-            st.caption("Masukkan PIN Admin untuk masuk dan menguji sistem saat maintenance:")
-            input_pin = st.text_input("PIN Admin", type="password", key="maint_pin_input")
-            if st.button("Masuk Sistem (Bypass)", use_container_width=True, type="primary"):
-                if input_pin == admin_pin:
-                    st.session_state["admin_authenticated"] = True
-                    st.toast("✅ Akses Admin berhasil diverifikasi!", icon="🔓")
-                    st.rerun()
-                else:
-                    st.error("PIN Admin tidak sesuai. Silakan hubungi Tim DTO.")
-
 def render_page_safely(view_fn, page_name: str):
     """
     Global Error Boundary untuk membungkus setiap halaman aplikasi
@@ -124,14 +68,6 @@ def render_page_safely(view_fn, page_name: str):
             st.code(traceback.format_exc(), language="text")
 
 def main():
-    maintenance_enabled, admin_pin = get_maintenance_config()
-    is_admin = st.session_state.get("admin_authenticated", False)
-    
-    # Jika mode maintenance aktif dan user belum terotentikasi sebagai Admin, tahan di layar maintenance
-    if maintenance_enabled and not is_admin:
-        show_maintenance_screen(admin_pin)
-        return
-
     if os.path.exists(LOGO_PATH):
         col_logo, col_txt = st.sidebar.columns([1, 3.2], vertical_alignment="center")
         with col_logo:
@@ -174,23 +110,6 @@ def main():
             st.rerun()
         else:
             st.experimental_rerun()
-            
-    # Status Mode Maintenance untuk Admin
-    if maintenance_enabled:
-        st.sidebar.markdown("---")
-        st.sidebar.warning("🛠️ **Mode Maintenance Aktif**\n\n*(Sedang diakses oleh Admin)*")
-        if st.sidebar.button("🔒 Keluar Akses Admin", use_container_width=True):
-            st.session_state["admin_authenticated"] = False
-            st.rerun()
-
-    # Panel Kontrol Maintenance bagi Admin
-    with st.sidebar.expander("⚙️ Kontrol Pemeliharaan"):
-        new_maint_state = st.toggle("Aktifkan Maintenance Mode", value=maintenance_enabled, key="toggle_maint_mode")
-        if new_maint_state != maintenance_enabled:
-            st.session_state["maintenance_active"] = new_maint_state
-            if new_maint_state:
-                st.session_state["admin_authenticated"] = True
-            st.rerun()
             
     st.sidebar.caption("Versi 2.2 - Protected by Tim DTO")
     
