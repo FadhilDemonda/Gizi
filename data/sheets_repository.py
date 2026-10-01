@@ -49,7 +49,7 @@ def get_sheet_data(sheet_name: str) -> pd.DataFrame:
         return df
     except Exception as e:
         logger.error(f"Failed to load data from sheet {sheet_name}: {e}", exc_info=True)
-        st.error(f"⚠️ Gagal memuat data dari tab '{sheet_name}'. Ini biasanya karena koneksi terputus atau batas limit Google Sheets. Silakan klik tombol **🔄 Refresh Data** di menu sebelah kiri.")
+        st.error(f"⚠️ Gagal memuat data dari tab '{sheet_name}'. Ini biasanya karena koneksi terputus atau batas limit Google Sheets. Silakan klik tombol **🔄 Refresh Data** di menu sebelah kiri atau hubungi **Tim DTO**.")
         return pd.DataFrame()
 
 def save_data(df: pd.DataFrame, sheet_name: str) -> None:
@@ -72,7 +72,7 @@ def save_data(df: pd.DataFrame, sheet_name: str) -> None:
         logger.info(f"Successfully saved data to {sheet_name} and cleared cache")
     except Exception as e:
         logger.error(f"Failed to save data to {sheet_name}: {e}", exc_info=True)
-        st.error(f"Gagal menyimpan data ke Google Sheets ({sheet_name}): {e}")
+        st.error(f"⚠️ Gagal menyimpan data ke tab '{sheet_name}'. Silakan coba beberapa saat lagi atau hubungi **Tim DTO**. (Detail: {e})")
 
 @st.cache_data(ttl=60, show_spinner=False)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
