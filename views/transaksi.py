@@ -214,18 +214,20 @@ def show_transaksi():
         item_options = master_df['nama_barang'].tolist()
         
         # Header for the dynamic rows (compact)
-        h1, h2, h3, h4, h5, h6 = st.columns([2.5, 1.5, 1.5, 1.5, 2, 0.5])
+        h1, h2, h3, h4, h5, h6, h7 = st.columns([2.3, 1.0, 1.3, 1.3, 1.6, 1.2, 0.4])
         h1.caption("Pilih Barang")
         h2.caption("Qty Masuk")
         h3.caption("HPP Master")
         h4.caption("Harga Beli Real")
-        h5.caption("Sisa Stok Saat Ini")
+        h5.caption("Status Perubahan Harga")
+        h6.caption("Sisa Stok")
+        h7.caption("")
         
         # To store data for validation & submission
         row_data = []
 
         for i, row_id in enumerate(st.session_state[state_items_key]):
-            c1, c2, c3, c4, c5, c6 = st.columns([2.5, 1.5, 1.5, 1.5, 2, 0.5])
+            c1, c2, c3, c4, c5, c6, c7 = st.columns([2.3, 1.0, 1.3, 1.3, 1.6, 1.2, 0.4])
             
             default_idx = 0
             if state_defaults_key in st.session_state and i < len(st.session_state[state_defaults_key]):
@@ -255,10 +257,38 @@ def show_transaksi():
                 st.markdown(f"<div style='font-size: 11px; color: gray; text-align: left; margin-top: -10px; margin-bottom: 5px; padding-left: 2px;'>Rp {harga_real:,.0f}</div>", unsafe_allow_html=True)
                 
             with c5:
+                # Notifikasi instan harga naik / turun / sama (di sebelah kiri sisa stok)
+                selisih_harga = harga_real - harga_master
+                if selisih_harga > 0:
+                    pct = (selisih_harga / harga_master * 100) if harga_master > 0 else 0
+                    st.markdown(f"""
+                        <div style="background-color: #fee2e2; border: 1px solid #f87171; color: #991b1b; padding: 6px 8px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 700; line-height: 1.2;">
+                            🔺 Naik +Rp {selisih_harga:,.0f}
+                            <div style="font-size: 10px; font-weight: 600; color: #b91c1c; margin-top: 2px;">(+{pct:.1f}% dr HPP)</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                elif selisih_harga < 0:
+                    selisih_abs = abs(selisih_harga)
+                    pct = (selisih_abs / harga_master * 100) if harga_master > 0 else 0
+                    st.markdown(f"""
+                        <div style="background-color: #dcfce7; border: 1px solid #4ade80; color: #166534; padding: 6px 8px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 700; line-height: 1.2;">
+                            🔻 Turun -Rp {selisih_abs:,.0f}
+                            <div style="font-size: 10px; font-weight: 600; color: #15803d; margin-top: 2px;">(-{pct:.1f}% dr HPP)</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                        <div style="background-color: #f3f4f6; border: 1px solid #d1d5db; color: #4b5563; padding: 6px 8px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 700; line-height: 1.2;">
+                            ⚖️ Sama Sesuai HPP
+                            <div style="font-size: 10px; font-weight: 500; color: #6b7280; margin-top: 2px;">Harga Normal</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+            with c6:
                 # Show current stock
                 st.info(f"{stok_fisik} {satuan}")
                 
-            with c6:
+            with c7:
                 # Trash button
                 st.button("🗑️", key=f"del_masuk_{row_id}", on_click=remove_row, args=(row_id,))
                 
@@ -346,24 +376,15 @@ def show_transaksi():
                     timestamp = datetime.datetime.combine(tgl_transaksi, now.time()).strftime("%Y-%m-%d %H:%M:%S")
                     
                     for r in row_data:
-                        idx = master_df_updated.index[master_df_updated['nama_barang'] == r['nama_barang']].tolist()[0]
+                        idx_list = master_df_updated.index[master_df_updated['nama_barang'] == r['nama_barang']].tolist()
+                        if idx_list:
+                            idx = idx_list[0]
+                            # HPP Master TETAP (tidak berubah dari harga realnya)
+                            # Hanya tambahkan stok fisik
+                            stok_baru = master_df_updated.at[idx, 'stok_sekarang'] + r['qty']
+                            master_df_updated.at[idx, 'stok_sekarang'] = stok_baru
                         
-                        # Update HPP to latest purchase price and log it if changed
-                        if r['harga_real'] > 0 and r['harga_real'] != r['harga_master']:
-                            master_df_updated.at[idx, 'harga_master'] = r['harga_real']
-                            new_crud_logs.append({
-                                "tanggal": timestamp,
-                                "kategori": "Update HPP Master",
-                                "kategori_freetext": "Sistem (Otomatis)",
-                                "nama_barang": r['nama_barang'],
-                                "keterangan": f"HPP Berubah dari {r['harga_master']} menjadi {r['harga_real']} (Berdasarkan Stok Masuk terbaru)"
-                            })
-                            
-                        # Add to stock
-                        stok_baru = master_df_updated.at[idx, 'stok_sekarang'] + r['qty']
-                        master_df_updated.at[idx, 'stok_sekarang'] = stok_baru
-                        
-                        # 1. Log Stok Masuk
+                        # 1. Log Stok Masuk (riwayat transaksi mencatat harga_master dan harga_real riil)
                         new_masuk_rows.append({
                             "tanggal": timestamp,
                             "shift": shift,

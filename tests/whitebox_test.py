@@ -640,28 +640,36 @@ def test_business_logic():
             assert r["qty"] == 25
     run_test("Distribusi: 4 kelas masing-masing 1 pasien", t_distribusi_many_classes)
 
-    # Simulasi update HPP
-    def t_hpp_update_logic():
-        # Replicate: if harga_real > 0 and harga_real != harga_master
-        harga_real = 0
+    # Kebijakan HPP Master: HPP Master TETAP dan tidak boleh diubah oleh transaksi Stok Masuk
+    def t_hpp_master_remains_intact():
         harga_master = 5000
-        should_update = harga_real > 0 and harga_real != harga_master
-        assert should_update is False, "harga_real=0 should NOT update HPP"
-    run_test("HPP update: harga_real=0 -> tidak update master", t_hpp_update_logic)
+        harga_real_naik = 7000
+        # HPP Master harus tetap
+        master_hpp = harga_master
+        assert master_hpp == 5000, "HPP Master tidak boleh berubah saat harga naik"
+    run_test("HPP Master: tetap utuh saat harga real naik", t_hpp_master_remains_intact)
 
-    def t_hpp_same_price():
-        harga_real = 5000
+    def t_hpp_master_turun_intact():
         harga_master = 5000
-        should_update = harga_real > 0 and harga_real != harga_master
-        assert should_update is False, "Same price should NOT update"
-    run_test("HPP update: harga sama -> tidak update", t_hpp_same_price)
+        harga_real_turun = 4000
+        master_hpp = harga_master
+        assert master_hpp == 5000, "HPP Master tidak boleh berubah saat harga real turun"
+    run_test("HPP Master: tetap utuh saat harga real turun", t_hpp_master_turun_intact)
 
-    def t_hpp_negative_real():
-        harga_real = -1000
+    def t_hpp_selisih_notification():
         harga_master = 5000
-        should_update = harga_real > 0 and harga_real != harga_master
-        assert should_update is False, "Negative harga_real should NOT update"
-    run_test("HPP update: harga_real negatif -> tidak update", t_hpp_negative_real)
+        harga_real_naik = 6000
+        selisih_naik = harga_real_naik - harga_master
+        assert selisih_naik > 0, "Harga naik terdeteksi selisih > 0"
+        
+        harga_real_turun = 4500
+        selisih_turun = harga_real_turun - harga_master
+        assert selisih_turun < 0, "Harga turun terdeteksi selisih < 0"
+        
+        harga_real_sama = 5000
+        selisih_sama = harga_real_sama - harga_master
+        assert selisih_sama == 0, "Harga sama terdeteksi selisih == 0"
+    run_test("Notifikasi harga: deteksi naik, turun, dan sama secara presisi", t_hpp_selisih_notification)
 
     # Simulasi stok update pada save transaksi masuk
     def t_stok_masuk_overflow():

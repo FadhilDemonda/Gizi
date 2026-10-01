@@ -103,6 +103,16 @@ def main():
     
     st.sidebar.markdown("---")
     
+    # Deteksi perpindahan halaman: Refresh data hanya saat pindah halaman (bukan per menit)
+    active_page = f"{kategori_menu} > {menu}"
+    if "last_active_page" not in st.session_state:
+        st.session_state["last_active_page"] = active_page
+    elif st.session_state["last_active_page"] != active_page:
+        st.session_state["last_active_page"] = active_page
+        if hasattr(st, 'cache_data'):
+            st.cache_data.clear()
+        logger.info(f"Pindah halaman ke '{active_page}': Cache data dibersihkan untuk memuat data terbaru.")
+    
     if st.sidebar.button("🔄 Refresh Data", use_container_width=True):
         if hasattr(st, 'cache_data'):
             st.cache_data.clear()

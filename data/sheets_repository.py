@@ -26,10 +26,11 @@ def get_gspread_client():
     """Get authenticated gspread client (cached for session)"""
     return gspread.service_account_from_dict(st.secrets["gcp_service_account"])
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(show_spinner=False)
 def get_sheet_data(sheet_name: str) -> pd.DataFrame:
     """
     Load data from a specific Google Sheet tab, cached for performance.
+    Data is refreshed only upon page change or explicit submit/refresh.
     """
     try:
         gc = get_gspread_client()
@@ -54,7 +55,7 @@ def get_sheet_data(sheet_name: str) -> pd.DataFrame:
 
 def save_data(df: pd.DataFrame, sheet_name: str) -> None:
     """
-    Save dataframe to Google Sheets and clear cache.
+    Save dataframe to Google Sheets and immediately clear cache so fresh data is loaded.
     """
     try:
         gc = get_gspread_client()
@@ -67,14 +68,17 @@ def save_data(df: pd.DataFrame, sheet_name: str) -> None:
         # Write new dataframe
         set_with_dataframe(ws, df)
         
-        # Invalidate cache for this specific sheet
+        # Invalidate cache completely so submitted data is instantly live
         get_sheet_data.clear()
+        load_data.clear()
+        if hasattr(st, 'cache_data'):
+            st.cache_data.clear()
         logger.info(f"Successfully saved data to {sheet_name} and cleared cache")
     except Exception as e:
         logger.error(f"Failed to save data to {sheet_name}: {e}", exc_info=True)
         st.error(f"⚠️ Gagal menyimpan data ke tab '{sheet_name}'. Silakan coba beberapa saat lagi atau hubungi **Tim DTO**. (Detail: {e})")
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(show_spinner=False)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Backward compatibility function during migration to new schema"""
     master_df = get_sheet_data(SHEET_MASTER)
