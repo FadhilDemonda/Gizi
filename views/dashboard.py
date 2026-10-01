@@ -197,10 +197,28 @@ def show_dashboard():
     hist_keluar = pd.concat(dfs_keluar, ignore_index=True) if dfs_keluar else pd.DataFrame()
     
     # METRICS
+    if not hist_masuk.empty and 'total_harga' in hist_masuk.columns:
+        if 'supplier' not in hist_masuk.columns:
+            hist_masuk['supplier'] = hist_masuk['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
+        else:
+            hist_masuk['supplier'] = hist_masuk.apply(
+                lambda row: row['keterangan'].split('| Supplier:')[1].split('|')[0].strip()
+                if (pd.isna(row['supplier']) or str(row['supplier']).strip() in ['', 'Unknown']) and '| Supplier:' in str(row['keterangan'])
+                else row['supplier'],
+                axis=1
+            )
+        hist_masuk['supplier'] = hist_masuk['supplier'].fillna('Unknown').replace('', 'Unknown')
+
     total_masuk = hist_masuk['qty'].sum() if not hist_masuk.empty else 0
     total_keluar_qty = hist_keluar['qty'].sum() if not hist_keluar.empty else 0
     
     total_pengeluaran = hist_keluar['total_harga'].sum() if not hist_keluar.empty and 'total_harga' in hist_keluar.columns else 0
+    total_belanja_masuk = hist_masuk['total_harga'].sum() if not hist_masuk.empty and 'total_harga' in hist_masuk.columns else 0
+    grand_total_pengeluaran = total_pengeluaran + total_belanja_masuk
+    
+    jml_supplier = hist_masuk['supplier'].nunique() if not hist_masuk.empty and 'supplier' in hist_masuk.columns else 0
+    jml_trx_masuk = len(hist_masuk) if not hist_masuk.empty else 0
+    
     total_hpp = (hist_keluar['qty'] * hist_keluar['harga_master']).sum() if not hist_keluar.empty and 'harga_master' in hist_keluar.columns and 'qty' in hist_keluar.columns else 0
     total_margin = total_pengeluaran - total_hpp
     
@@ -221,20 +239,18 @@ def show_dashboard():
     st.markdown("---")
     st.markdown("<br>", unsafe_allow_html=True)
     
-
-    
     # RANGKUMAN FINANSIAL & ENTITAS
-    col_fin, col_layanan = st.columns([2.5, 2.5])
+    col_fin, col_layanan = st.columns([1.8, 3.2])
     
     with col_fin:
         with st.container(border=True):
-            st.markdown("##### 💰 Pengeluaran")
-            st.metric("Total Keseluruhan", f"Rp {total_pengeluaran:,.0f}")
-            st.caption("&nbsp;") # Spacer to match the height of the captions in col_layanan
+            st.markdown("##### 💰 Total Semua Pengeluaran")
+            st.metric("Total Keseluruhan", f"Rp {grand_total_pengeluaran:,.0f}")
+            st.caption(f"Layanan: Rp {total_pengeluaran:,.0f} • Belanja: Rp {total_belanja_masuk:,.0f}")
             
     with col_layanan:
         with st.container(border=True):
-            st.markdown("##### 👥 Kategori Layanan")
+            st.markdown("##### 👥 3 Kategori Layanan & Supplier")
             if not hist_pasien.empty:
                 if 'jumlah_pasien' in hist_pasien.columns:
                     # Parse to numeric and fillna with 1 just in case, then group by transaction
@@ -253,9 +269,9 @@ def show_dashboard():
             cost_dokter = hist_dokter['total_harga'].sum() if not hist_dokter.empty and 'total_harga' in hist_dokter.columns else 0
             cost_manajemen = hist_manajemen['total_harga'].sum() if not hist_manajemen.empty and 'total_harga' in hist_manajemen.columns else 0
             
-            total_entitas = jml_pasien + jml_dokter + jml_manajemen
+            total_entitas = jml_pasien + jml_dokter + jml_manajemen + jml_supplier
             
-            e1, e2, e3 = st.columns(3)
+            e1, e2, e3, e4 = st.columns(4)
             with e1:
                 st.metric("Pasien", f"{jml_pasien} ")
                 st.caption(f"Rp {cost_pasien:,.0f}")
@@ -265,6 +281,9 @@ def show_dashboard():
             with e3:
                 st.metric("Manajemen", f"{jml_manajemen} ")
                 st.caption(f"Rp {cost_manajemen:,.0f}")
+            with e4:
+                st.metric("Supplier", f"{jml_supplier} ")
+                st.caption(f"Rp {total_belanja_masuk:,.0f}")
             
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -273,8 +292,15 @@ def show_dashboard():
     
     with col_chart:
         st.subheader("Distribusi Biaya Pengeluaran")
+        pie_list = []
         if not hist_keluar.empty and 'total_harga' in hist_keluar.columns:
-            pie_data = hist_keluar.groupby('Sumber')['total_harga'].sum().reset_index()
+            pie_keluar = hist_keluar.groupby('Sumber')['total_harga'].sum().reset_index()
+            pie_list.append(pie_keluar)
+        if total_belanja_masuk > 0:
+            pie_list.append(pd.DataFrame([{'Sumber': 'Supplier', 'total_harga': total_belanja_masuk}]))
+            
+        if pie_list:
+            pie_data = pd.concat(pie_list, ignore_index=True)
             fig = px.pie(pie_data, values='total_harga', names='Sumber', hole=0.4, 
                          color_discrete_sequence=px.colors.qualitative.Pastel)
             fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
@@ -319,17 +345,6 @@ def show_dashboard():
     
     st.subheader("Beban Pengeluaran per Supplier (Belanja)")
     if not hist_masuk.empty and 'total_harga' in hist_masuk.columns:
-        if 'supplier' not in hist_masuk.columns:
-            hist_masuk['supplier'] = hist_masuk['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
-        else:
-            hist_masuk['supplier'] = hist_masuk.apply(
-                lambda row: row['keterangan'].split('| Supplier:')[1].split('|')[0].strip()
-                if (pd.isna(row['supplier']) or str(row['supplier']).strip() in ['', 'Unknown']) and '| Supplier:' in str(row['keterangan'])
-                else row['supplier'],
-                axis=1
-            )
-        hist_masuk['supplier'] = hist_masuk['supplier'].fillna('Unknown').replace('', 'Unknown')
-            
         # Total per supplier (bukan per barang), limit max 25
         supplier_data = hist_masuk.groupby('supplier')['total_harga'].sum().reset_index()
         supplier_data = supplier_data.sort_values(by='total_harga', ascending=False).head(25)

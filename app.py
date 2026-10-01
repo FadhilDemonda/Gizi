@@ -14,14 +14,33 @@ from views.analisis_stok import show_analisis_stok
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s - %(message)s")
 
+# Logo Configuration
+LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "styles", "Rumah_Sakit_Annisa_Tangerang-removebg-preview.png")
+
 # Global Configuration
-st.set_page_config(page_title="Stok-Gizi App", page_icon="📦", layout="wide")
+if os.path.exists(LOGO_PATH):
+    st.set_page_config(page_title="Stok Gizi RS An-Nisa", page_icon=LOGO_PATH, layout="wide")
+else:
+    st.set_page_config(page_title="Stok-Gizi App", page_icon="📦", layout="wide")
+
 inject_custom_css()
 init_session_state()
 
 def main():
-    st.sidebar.title("📦 Stok-Gizi")
-    st.sidebar.markdown("Aplikasi Manajemen Stok Makanan")
+    if os.path.exists(LOGO_PATH):
+        c_l1, c_l2, c_l3 = st.sidebar.columns([1, 2, 1])
+        with c_l2:
+            st.image(LOGO_PATH, use_container_width=True)
+        st.sidebar.markdown(
+            "<div style='text-align: center; margin-top: -6px; margin-bottom: 14px;'>"
+            "<h2 style='margin: 0; font-size: 1.35rem; font-weight: 700;'>Stok Gizi</h2>"
+            "<span style='font-size: 0.82rem; opacity: 0.8;'>RS An-Nisa Tangerang</span>"
+            "</div>",
+            unsafe_allow_html=True
+        )
+    else:
+        st.sidebar.title("📦 Stok-Gizi")
+        st.sidebar.markdown("Aplikasi Manajemen Stok Makanan")
     
     # 2-Level Menu System
     kategori_menu = st.sidebar.selectbox(

@@ -3,6 +3,7 @@ import datetime
 import pandas as pd
 import time
 from data.sheets_repository import get_sheet_data, save_data, SHEET_MASTER, SHEET_STOK_MASUK
+from views.dialog_tambah_barang import dialog_tambah_barang
 
 def show_toast(message, icon="✅", color="#22c55e"):
     """Tampilkan toast notification di pojok kanan atas seperti alert web."""
@@ -150,6 +151,10 @@ def show_transaksi():
     
     st.title("📥 Input Stok Masuk (Belanja)")
     
+    toast_key = 'toast_msg_masuk'
+    if toast_key in st.session_state:
+        show_toast(st.session_state.pop(toast_key))
+        
     master_df = get_sheet_data(SHEET_MASTER)
     if master_df.empty:
         st.warning("Data Master Barang kosong!")
@@ -230,12 +235,13 @@ def show_transaksi():
             # Get item data
             item_data = master_df[master_df['nama_barang'] == selected_item].iloc[0]
             stok_fisik = float(item_data.get('stok_sekarang', 0))
-            satuan = item_data['satuan']
+            satuan = str(item_data.get('satuan', '')).strip()
             kategori = item_data.get('kategori', '')
             harga_master = float(item_data.get('harga_master', 0))
             
             with c2:
                 qty = st.number_input("Qty", min_value=0.0, value=1.0, step=1.0, format="%.2f", key=f"qty_masuk_{row_id}", label_visibility="collapsed")
+                st.markdown(f"<div style='font-size: 11px; color: gray; text-align: left; margin-top: -10px; margin-bottom: 5px; padding-left: 2px;'>{satuan}</div>", unsafe_allow_html=True)
             
             with c3:
                 st.text_input("HPP", value=f"Rp {harga_master:,.0f}", disabled=True, key=f"hpp_masuk_{row_id}_{selected_item}", label_visibility="collapsed")
@@ -261,7 +267,7 @@ def show_transaksi():
             })
             
         # Add Item Button
-        btn_col1, btn_col2, btn_col3, _ = st.columns([1.5, 1.5, 1.5, 0.5])
+        btn_col1, btn_col2, btn_col3, btn_col4 = st.columns([1.3, 1.4, 1.4, 1.1])
         with btn_col1:
             st.button("➕ Tambah 1 Baris Kosong", on_click=add_row, key="add_masuk", use_container_width=True)
         with btn_col2:
@@ -275,6 +281,9 @@ def show_transaksi():
                         current_items_in_form.append(item_val)
                 multi_select_dialog(master_df, state_items_key, state_defaults_key, current_items_in_form)
         with btn_col3:
+            if st.button("📦 Tambah Barang Baru", key="new_item_masuk", use_container_width=True):
+                dialog_tambah_barang(state_items_key, state_defaults_key, toast_key=toast_key)
+        with btn_col4:
             st.markdown('<span class="btn-clear-target"></span>', unsafe_allow_html=True)
             st.button("🗑️ Bersihkan Semua", on_click=clear_all, key="clear_all_masuk", use_container_width=True)
         
