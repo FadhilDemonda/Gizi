@@ -13,7 +13,9 @@ def show_laporan_harian():
     col_d, col_e = st.columns([3, 1])
     with col_d:
         today = datetime.date.today()
-        date_range = st.date_input("📅 Rentang Waktu Laporan:", value=(today, today))
+        # Default rentang waktu: bila awal bulan, otomatis sertakan 7 hari terakhir agar data bulan sebelumnya tetap terlihat
+        default_start = today - datetime.timedelta(days=7) if today.day <= 3 else today.replace(day=1)
+        date_range = st.date_input("📅 Rentang Waktu Laporan:", value=(default_start, today))
         
     if len(date_range) != 2:
         st.warning("Silakan lengkapi rentang tanggal (Mulai - Akhir) untuk melihat laporan.")
@@ -66,7 +68,15 @@ def show_laporan_harian():
     with col_f2:
         available_sups = ["Pak Urip", "Wahana", "Ari Snack", "Supplier Yulia", "Roti Mayestik"]
         if not df_masuk.empty:
-            df_masuk['supplier'] = df_masuk['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
+            if 'supplier' not in df_masuk.columns:
+                df_masuk['supplier'] = df_masuk['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
+            else:
+                df_masuk['supplier'] = df_masuk.apply(
+                    lambda row: row['keterangan'].split('| Supplier:')[1].split('|')[0].strip()
+                    if (pd.isna(row['supplier']) or str(row['supplier']).strip() in ['', 'Unknown']) and '| Supplier:' in str(row['keterangan'])
+                    else row['supplier'],
+                    axis=1
+                )
             extra_sups = [s for s in df_masuk['supplier'].dropna().unique() if s not in available_sups and str(s).strip() != '']
             available_sups.extend(extra_sups)
             
@@ -75,13 +85,33 @@ def show_laporan_harian():
     if selected_shifts:
         if not f_keluar.empty and 'shift' in f_keluar.columns:
             f_keluar = f_keluar[f_keluar['shift'].isin(selected_shifts)]
+        if not f_masuk.empty and 'shift' in f_masuk.columns:
+            shift_prefixes = [s.split()[0].lower() for s in selected_shifts]
+            def match_shift(val):
+                val_str = str(val).lower()
+                for p in shift_prefixes:
+                    if p in val_str:
+                        return True
+                    if p in ['malam', 'siang'] and 'sore' in val_str:
+                        return True
+                return False
+            f_masuk = f_masuk[f_masuk['shift'].apply(match_shift)]
     else:
         if not f_keluar.empty:
             f_keluar = f_keluar.iloc[0:0]
+        if not f_masuk.empty:
+            f_masuk = f_masuk.iloc[0:0]
             
     if sup_filter and not f_masuk.empty:
         if 'supplier' not in f_masuk.columns:
             f_masuk['supplier'] = f_masuk['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
+        else:
+            f_masuk['supplier'] = f_masuk.apply(
+                lambda row: row['keterangan'].split('| Supplier:')[1].split('|')[0].strip()
+                if (pd.isna(row['supplier']) or str(row['supplier']).strip() in ['', 'Unknown']) and '| Supplier:' in str(row['keterangan'])
+                else row['supplier'],
+                axis=1
+            )
         f_masuk = f_masuk[f_masuk['supplier'].isin(sup_filter)]
             
     st.markdown("<br>", unsafe_allow_html=True)
@@ -222,28 +252,109 @@ def show_laporan_harian():
             )
             
     with tab2:
-        st.subheader(f"Tabel Pembelian dari Supplier ({len(f_masuk)} Transaksi)")
         if f_masuk.empty:
-            st.info(f"Tidak ada data pembelian/stok masuk pada periode {start_date.strftime('%d %b %Y')} s/d {end_date.strftime('%d %b %Y')} untuk supplier yang difilter.")
+            st.subheader("Tabel Rekapan Pembelian dari Supplier")
+            st.info(f"Tidak ada data pembelian/stok masuk pada periode {start_date.strftime('%d %b %Y')} s/d {end_date.strftime('%d %b %Y')} untuk filter yang dipilih.")
         else:
-            if 'supplier' not in f_masuk.columns:
-                f_masuk['supplier'] = f_masuk['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
-                
-            disp_masuk = f_masuk[['tanggal', 'shift', 'supplier', 'nama_barang', 'qty', 'harga_master', 'harga_real', 'total_harga', 'keterangan']].copy()
-            disp_masuk = disp_masuk.sort_values(by=['tanggal', 'shift'], ascending=[False, True])
+            df_m = f_masuk.copy()
+            if 'supplier' not in df_m.columns:
+                df_m['supplier'] = df_m['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
+            df_m['supplier'] = df_m['supplier'].fillna('Unknown').replace('', 'Unknown')
             
-            # Formatting
-            format_cols = ['harga_master', 'harga_real', 'total_harga']
-            for c in format_cols:
-                disp_masuk[c] = disp_masuk[c].apply(lambda x: f"Rp {pd.to_numeric(x, errors='coerce'):,.0f}")
-                
-            st.dataframe(disp_masuk, use_container_width=True, hide_index=True)
+            # Format date & columns
+            df_m['Tanggal'] = pd.to_datetime(df_m['tanggal'], errors='coerce').dt.strftime('%Y-%m-%d')
+            df_m['Shift'] = df_m['shift'].fillna('-')
+            df_m['Supplier'] = df_m['supplier']
             
-            # CSV export
-            csv_masuk = disp_masuk.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Export ke CSV (Pembelian Supplier)",
-                data=csv_masuk,
-                file_name=f"Rekapan_Pembelian_Supplier_{start_date}_sd_{end_date}.csv",
-                mime="text/csv",
-            )
+            df_m['qty'] = pd.to_numeric(df_m['qty'], errors='coerce').fillna(0)
+            df_m['harga_master'] = pd.to_numeric(df_m['harga_master'], errors='coerce').fillna(0)
+            df_m['harga_real'] = pd.to_numeric(df_m['harga_real'], errors='coerce').fillna(0)
+            if 'total_harga' in df_m.columns:
+                df_m['total_harga'] = pd.to_numeric(df_m['total_harga'], errors='coerce').fillna(0)
+            else:
+                df_m['total_harga'] = df_m['qty'] * df_m['harga_real']
+            
+            df_m['total_hpp_row'] = df_m['qty'] * df_m['harga_master']
+            
+            def clean_ket(val):
+                if pd.isna(val) or str(val).strip() in ['', 'None', 'nan']:
+                    return ""
+                s = str(val).strip()
+                if '| Supplier:' in s:
+                    s = s.split('| Supplier:')[0].strip()
+                return s
+
+            # Grouping per Tanggal, Shift, Supplier (Rekapan)
+            rekap_rows = []
+            grouped = df_m.groupby(['Tanggal', 'Shift', 'Supplier'], sort=False)
+            
+            for (tgl, shf, sup), group in grouped:
+                jml_barang = group['nama_barang'].nunique()
+                tot_qty = group['qty'].sum()
+                sum_harga_master = group['harga_master'].sum()
+                sum_harga_real = group['harga_real'].sum()
+                tot_harga_semua = group['total_harga'].sum()
+                tot_hpp = group['total_hpp_row'].sum()
+                selisih_hpp = tot_harga_semua - tot_hpp
+                
+                notes = [clean_ket(k) for k in group['keterangan'].dropna().unique()]
+                notes = [n for n in notes if n]
+                ket_text = ", ".join(notes) if notes else "-"
+                
+                rekap_rows.append({
+                    'Tanggal': tgl,
+                    'Shift': shf,
+                    'Supplier': sup,
+                    'Jumlah Barang': jml_barang,
+                    'Total Qty': tot_qty,
+                    'Jumlah Harga Master': sum_harga_master,
+                    'Jumlah Harga Beli Real': sum_harga_real,
+                    'Harga Total Semua': tot_harga_semua,
+                    'Selisih HPP': selisih_hpp,
+                    'Keterangan': ket_text
+                })
+                
+            rekap_df = pd.DataFrame(rekap_rows)
+            rekap_df = rekap_df.sort_values(by=['Tanggal', 'Shift'], ascending=[False, True])
+            
+            st.subheader(f"Tabel Rekapan Pembelian / Supplier ({len(rekap_df)} Rekapan, {len(df_m)} Transaksi Mentah)")
+            
+            # Formatted display DataFrame
+            display_rekap = rekap_df.copy()
+            
+            # Format number & currency
+            display_rekap['Jumlah Barang'] = display_rekap['Jumlah Barang'].apply(lambda x: f"{x:,.0f} Macam")
+            display_rekap['Total Qty'] = display_rekap['Total Qty'].apply(lambda x: f"{x:,.0f}")
+            display_rekap['Jumlah Harga Master'] = display_rekap['Jumlah Harga Master'].apply(lambda x: f"Rp {x:,.0f}")
+            display_rekap['Jumlah Harga Beli Real'] = display_rekap['Jumlah Harga Beli Real'].apply(lambda x: f"Rp {x:,.0f}")
+            display_rekap['Harga Total Semua'] = display_rekap['Harga Total Semua'].apply(lambda x: f"Rp {x:,.0f}")
+            
+            def format_selisih(val):
+                if val > 0:
+                    return f"🔴 +Rp {val:,.0f}"
+                elif val < 0:
+                    return f"🟢 -Rp {abs(val):,.0f}"
+                return "Rp 0"
+                
+            display_rekap['Selisih HPP'] = display_rekap['Selisih HPP'].apply(format_selisih)
+            
+            st.dataframe(display_rekap, use_container_width=True, hide_index=True)
+            
+            # Export CSV for Rekapan
+            csv_rekap = rekap_df.to_csv(index=False).encode('utf-8')
+            col_exp1, _ = st.columns([1, 1])
+            with col_exp1:
+                st.download_button(
+                    label="📥 Export ke CSV (Rekapan Pembelian Supplier)",
+                    data=csv_rekap,
+                    file_name=f"Rekapan_Pembelian_Supplier_{start_date}_sd_{end_date}.csv",
+                    mime="text/csv",
+                )
+                
+            # Detail expander
+            with st.expander("🔍 Lihat Rincian Semua Item Barang (Detail Mentah)"):
+                detail_df = df_m[['tanggal', 'shift', 'supplier', 'nama_barang', 'qty', 'harga_master', 'harga_real', 'total_harga', 'keterangan']].copy()
+                detail_df = detail_df.sort_values(by=['tanggal', 'shift'], ascending=[False, True])
+                for c in ['harga_master', 'harga_real', 'total_harga']:
+                    detail_df[c] = detail_df[c].apply(lambda x: f"Rp {x:,.0f}")
+                st.dataframe(detail_df, use_container_width=True, hide_index=True)
