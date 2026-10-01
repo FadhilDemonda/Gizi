@@ -77,7 +77,7 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
             
     search_q = st.text_input("🔍 Cari Barang:", placeholder="Ketik nama atau kode barang...", label_visibility="collapsed")
     if search_q:
-        filtered_df = filtered_df[filtered_df['nama_barang'].str.contains(search_q, case=False, na=False)]
+        filtered_df = filtered_df[filtered_df['nama_barang'].str.contains(search_q, case=False, na=False, regex=False)]
         
     item_options = filtered_df['nama_barang'].tolist()
     
@@ -433,7 +433,7 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
             submit = st.button(f"✓ Simpan Transaksi", type="primary", use_container_width=True, key=f"btn_simpan_{tab_name}")
             
         if submit:
-            if not freetext_val:
+            if not str(freetext_val).strip():
                 st.error("Identitas / Keterangan wajib diisi!")
                 return
             if len(row_data) == 0:
@@ -453,9 +453,11 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
                     
                     for r in row_data:
                         # 1. Update stok in copy
-                        idx = master_df_updated.index[master_df_updated['nama_barang'] == r['nama_barang']].tolist()[0]
-                        stok_baru = master_df_updated.at[idx, 'stok_sekarang'] - r['qty']
-                        master_df_updated.at[idx, 'stok_sekarang'] = stok_baru
+                        idx_list = master_df_updated.index[master_df_updated['nama_barang'] == r['nama_barang']].tolist()
+                        if idx_list:
+                            idx = idx_list[0]
+                            stok_baru = master_df_updated.at[idx, 'stok_sekarang'] - r['qty']
+                            master_df_updated.at[idx, 'stok_sekarang'] = stok_baru
                         
                         timestamp = datetime.datetime.combine(tgl_transaksi, now.time()).strftime("%Y-%m-%d %H:%M:%S")
                         row_dict = {

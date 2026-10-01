@@ -72,8 +72,13 @@ def filter_last_n_days(df_trx: pd.DataFrame, n_days: int) -> pd.DataFrame:
     if df_trx.empty or 'tanggal_dt' not in df_trx.columns:
         return df_trx
         
-    batas_tanggal = pd.Timestamp.today() - pd.Timedelta(days=n_days)
-    return df_trx[df_trx['tanggal_dt'] >= batas_tanggal].copy()
+    try:
+        # Clamp to prevent OutOfBoundsTimedelta from extreme values (up to 1000 years)
+        n_days_clamped = max(0, min(int(n_days), 365000))
+        batas_tanggal = pd.Timestamp.today() - pd.Timedelta(days=n_days_clamped)
+        return df_trx[df_trx['tanggal_dt'] >= batas_tanggal].copy()
+    except Exception:
+        return df_trx
 
 def aggregate_trend_data(df_trx_filtered: pd.DataFrame) -> pd.DataFrame:
     """

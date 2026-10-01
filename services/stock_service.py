@@ -76,6 +76,7 @@ def classify_stock_status(stok_sekarang: float, stok_minimum: float, persentase:
 def calculate_bar_width(stok_sekarang: float, stok_minimum: float) -> int:
     """
     Calculate the progress bar width for the dashboard visualization.
+    Clamped strictly between 0 and 100 to prevent broken UI layouts.
     
     Args:
         stok_sekarang (float): Current stock.
@@ -84,7 +85,10 @@ def calculate_bar_width(stok_sekarang: float, stok_minimum: float) -> int:
     Returns:
         int: Bar width percentage (0 to 100).
     """
-    return int(min(100.0, (stok_sekarang / max(1.0, stok_minimum * 2)) * 100.0))
+    if stok_sekarang <= 0:
+        return 0
+    pct = (stok_sekarang / max(1.0, stok_minimum * 2)) * 100.0
+    return max(0, min(100, int(pct)))
 
 def filter_stock_by_status(master_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -96,6 +100,12 @@ def filter_stock_by_status(master_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Da
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]: (krisis_df, mendekati_df, aman_df, bebas_df)
     """
+    if master_df.empty or 'stok_sekarang' not in master_df.columns or 'stok_minimum' not in master_df.columns:
+        empty = pd.DataFrame(columns=master_df.columns)
+        return empty.copy(), empty.copy(), empty.copy(), empty.copy()
+
+    master_df = master_df.copy()
+    
     # Ensure kategori column exists for filtering
     has_kat = 'kategori' in master_df.columns
     

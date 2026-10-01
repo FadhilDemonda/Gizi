@@ -94,8 +94,8 @@ def show_analisis_stok():
             
     if search_q:
         full_df = full_df[
-            full_df['nama_barang'].str.contains(search_q, case=False, na=False) | 
-            full_df['kode_barang'].str.contains(search_q, case=False, na=False)
+            full_df['nama_barang'].str.contains(search_q, case=False, na=False, regex=False) | 
+            full_df['kode_barang'].str.contains(search_q, case=False, na=False, regex=False)
         ]
         
     if len(full_df) == 0:

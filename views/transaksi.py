@@ -78,7 +78,7 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
             
     search_q = st.text_input("🔍 Cari Barang:", placeholder="Ketik nama atau kode barang...", label_visibility="collapsed")
     if search_q:
-        filtered_df = filtered_df[filtered_df['nama_barang'].str.contains(search_q, case=False, na=False)]
+        filtered_df = filtered_df[filtered_df['nama_barang'].str.contains(search_q, case=False, na=False, regex=False)]
         
     item_options = filtered_df['nama_barang'].tolist()
     
@@ -315,15 +315,20 @@ def show_transaksi():
             submit = st.button(f"✓ Simpan Stok Masuk", type="primary", use_container_width=True, key="btn_simpan_masuk")
             
         if submit:
-            if not petugas:
+            if not str(petugas).strip():
                 st.error("Nama Petugas wajib diisi!")
-            elif not supplier:
+                return
+            elif not str(supplier).strip():
                 st.error("Nama Supplier wajib diisi!")
-            elif not freetext_val:
+                return
+            elif not str(freetext_val).strip():
                 st.error("Nota / Keterangan Pembelian wajib diisi!")
                 return
             if len(row_data) == 0:
                 st.error("Pilih minimal 1 barang!")
+                return
+            if any(r['qty'] <= 0 for r in row_data):
+                st.error("Qty untuk setiap barang harus lebih besar dari 0!")
                 return
 
             with st.spinner("Menyimpan stok masuk..."):

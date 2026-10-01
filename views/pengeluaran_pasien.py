@@ -195,12 +195,14 @@ def show_pengeluaran_pasien():
                     
                     for r in row_data:
                         # Potong stok master
-                        idx = master_df_updated.index[master_df_updated['nama_barang'] == r['nama_barang']].tolist()[0]
-                        master_df_updated.at[idx, 'stok_sekarang'] = master_df_updated.at[idx, 'stok_sekarang'] - r['qty']
+                        idx_list = master_df_updated.index[master_df_updated['nama_barang'] == r['nama_barang']].tolist()
+                        if idx_list:
+                            idx = idx_list[0]
+                            master_df_updated.at[idx, 'stok_sekarang'] = master_df_updated.at[idx, 'stok_sekarang'] - r['qty']
                         
                         # Pecah proporsional
                         for kat, jml in distribusi:
-                            if jml > 0:
+                            if jml > 0 and total_pasien > 0:
                                 porsi = jml / total_pasien
                                 qty_proporsional = r['qty'] * porsi
                                 

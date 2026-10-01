@@ -25,6 +25,8 @@ def validate_stock_out(stok_awal: float, jumlah_keluar: float) -> Tuple[bool, fl
     Returns:
         Tuple[bool, float]: (is_valid, stok_akhir)
     """
+    if jumlah_keluar < 0:
+        return False, stok_awal
     stok_akhir = stok_awal - jumlah_keluar
     is_valid = stok_akhir >= 0
     return is_valid, stok_akhir
@@ -41,10 +43,12 @@ def compute_stok_akhir(stok_awal: float, jumlah: float, jenis_transaksi: str) ->
     Returns:
         float: Final stock.
     """
-    if jenis_transaksi == "Masuk":
-        return stok_awal + jumlah
-    elif jenis_transaksi == "Keluar":
-        return stok_awal - jumlah
+    jenis = str(jenis_transaksi).strip().capitalize()
+    val = max(0.0, float(jumlah))
+    if jenis == "Masuk":
+        return stok_awal + val
+    elif jenis == "Keluar":
+        return stok_awal - val
     return stok_awal
 
 def build_transaction_record(

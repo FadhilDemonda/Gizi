@@ -13,9 +13,9 @@ def validate_new_item(kode_brg: str, nama_brg: str, master_df: pd.DataFrame) -> 
     Returns:
         Tuple[bool, str]: (is_valid, error_message)
     """
-    if kode_brg == "" or nama_brg == "":
+    if not str(kode_brg).strip() or not str(nama_brg).strip():
         return False, "Kode dan Nama Barang harus diisi!"
-    if kode_brg in master_df['kode_barang'].values:
+    if str(kode_brg).strip() in master_df['kode_barang'].values:
         return False, "Kode Barang sudah terdaftar!"
     return True, ""
 
@@ -46,8 +46,13 @@ def validate_transaction(petugas: str, jumlah: float) -> Tuple[bool, str]:
     Returns:
         Tuple[bool, str]: (is_valid, error_message)
     """
-    if not petugas:
+    if not str(petugas).strip():
         return False, "Nama petugas harus diisi!"
-    if jumlah == 0:
-        return False, "Jumlah perubahan tidak boleh 0!"
+    try:
+        val = float(jumlah)
+        import math
+        if math.isnan(val) or math.isinf(val) or val <= 0:
+            return False, "Jumlah perubahan harus lebih besar dari 0!"
+    except (ValueError, TypeError):
+        return False, "Jumlah perubahan tidak valid!"
     return True, ""
