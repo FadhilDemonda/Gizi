@@ -1,82 +1,133 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-from data.sheets_repository import load_data
-from services.report_service import filter_last_n_days, aggregate_trend_data
+from data.sheets_repository import load_data, get_sheet_data, SHEET_STOK_MASUK
+from services.stock_service import (
+    classify_stock_status, 
+    calculate_bar_width,
+    filter_stock_by_status
+)
+from utils.formatting import get_header_html, get_row_html
 
 def show_analisis_stok():
-    st.header("📈 Analisis & Laporan Stok")
-    st.caption("Pantau statistik pergerakan barang, riwayat, dan grafik tren masuk/keluar.")
+    st.header("📈 Analisis Stok Gudang")
     
-    master_df, transaksi_df = load_data()
+    master_df, _ = load_data()
     
-    if len(transaksi_df) == 0:
-        st.info("Belum ada data transaksi yang dicatat.")
+    if master_df.empty:
+        st.info("Belum ada data barang di Master Data.")
         return
         
-    try:
-        transaksi_df['tanggal_dt'] = pd.to_datetime(transaksi_df['tanggal'])
-    except Exception:
-        import logging
-        logging.getLogger(__name__).warning("Format tanggal di database transaksi belum terstandarisasi.")
-        transaksi_df['tanggal_dt'] = pd.to_datetime('today')
+    master_df['stok_minimum_safe'] = master_df['stok_minimum'].apply(lambda x: max(x, 1))
+    master_df['persentase'] = master_df['stok_sekarang'] / master_df['stok_minimum_safe']
     
-    st.subheader("1. Laporan Detail Per Barang")
-    brg_options = master_df['kode_barang'] + " - " + master_df['nama_barang']
-    selected_brg = st.selectbox("Pilih Barang yang ingin dianalisis:", brg_options)
+    krisis_df, mendekati_df, aman_df, bebas_df = filter_stock_by_status(master_df)
     
-    kode_brg = selected_brg.split(" - ")[0]
-    nama_brg = selected_brg.split(" - ")[1]
-    
-    item_master = master_df[master_df['kode_barang'] == kode_brg].iloc[0]
-    satuan = item_master['satuan']
-    
-    df_trx = transaksi_df[transaksi_df['kode_barang'] == kode_brg].copy()
-    
-    with st.container(border=True):
-        st.markdown(f"**Statistik Kumulatif: {nama_brg}**")
-        c1, c2, c3, c4 = st.columns(4)
-        
-        total_trx = len(df_trx)
-        total_masuk = df_trx[df_trx['jenis'] == 'Masuk']['jumlah'].sum() if total_trx > 0 else 0
-        total_keluar = df_trx[df_trx['jenis'] == 'Keluar']['jumlah'].sum() if total_trx > 0 else 0
-        
-        with c1: st.metric("Total Transaksi", f"{total_trx} Kali")
-        with c2: st.metric("Total Barang Masuk", f"{total_masuk} {satuan}")
-        with c3: st.metric("Total Barang Keluar", f"{total_keluar} {satuan}")
-        with c4: st.metric("Sisa Stok (Saat Ini)", f"{item_master['stok_sekarang']} {satuan}")
-        
+    # Scorecards
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        with st.container(border=True):
+            st.markdown("🏢 **Total Barang**")
+            st.markdown(f"<h2>{len(master_df)} <span style='font-size:16px'>SKU</span></h2>", unsafe_allow_html=True)
+    with col2:
+        with st.container(border=True):
+            st.markdown("🚨 **Stok Habis**")
+            st.markdown(f"<h2 style='color:#d32f2f'>{len(krisis_df)} <span style='font-size:16px; opacity: 0.7;'>SKU</span></h2>", unsafe_allow_html=True)
+    with col3:
+        with st.container(border=True):
+            st.markdown("⚠️ **Mendekati Min**")
+            st.markdown(f"<h2 style='color:#fbc02d'>{len(mendekati_df)} <span style='font-size:16px; opacity: 0.7;'>SKU</span></h2>", unsafe_allow_html=True)
+    with col4:
+        with st.container(border=True):
+            st.markdown("✅ **Stok Aman**")
+            st.markdown(f"<h2 style='color:#388e3c'>{len(aman_df)} <span style='font-size:16px; opacity: 0.7;'>SKU</span></h2>", unsafe_allow_html=True)
+    with col5:
+        with st.container(border=True):
+            st.markdown("🍲 **Bahan Bebas**")
+            st.markdown(f"<h2 style='color:#1976d2'>{len(bebas_df)} <span style='font-size:16px; opacity: 0.7;'>SKU</span></h2>", unsafe_allow_html=True)
+            
     st.markdown("---")
     
-    col_t1, col_t2 = st.columns([3, 1])
-    with col_t1:
-        st.subheader("2. Riwayat & Grafik Transaksi")
-    with col_t2:
-        n_hari = st.selectbox("Rentang Waktu:", [7, 14, 30, 90, 365], index=2, format_func=lambda x: f"{x} Hari Terakhir")
-        
-    df_trx_filtered = filter_last_n_days(df_trx, n_hari)
+    # --- DAFTAR SELURUH STOK BARANG ---
+    full_df = pd.concat([krisis_df, mendekati_df, aman_df, bebas_df]).sort_values(by='persentase')
     
-    if len(df_trx_filtered) > 0:
-        daily_trx = aggregate_trend_data(df_trx_filtered)
+    col_title, col_sup, col_filter, col_search = st.columns([1, 1, 1, 1])
+    with col_title:
+        st.markdown(get_header_html(len(full_df)), unsafe_allow_html=True)
+    with col_sup:
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        hist_masuk = get_sheet_data(SHEET_STOK_MASUK)
+        available_sups = ["Pak Urip", "Wahana", "Ari Snack", "Supplier Yulia", "Roti Mayestik"]
+        if not hist_masuk.empty and 'supplier' in hist_masuk.columns:
+            extra_sups = [s for s in hist_masuk['supplier'].dropna().unique() if s not in available_sups and str(s).strip() != '']
+            available_sups.extend(extra_sups)
+        sup_filter = st.multiselect("Supplier:", available_sups, placeholder="Filter by Supplier...", label_visibility="collapsed")
+    with col_filter:
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        status_filter = st.multiselect("Status:", ["Krisis", "Minimum", "Aman", "Bahan Bebas"], default=["Krisis", "Minimum", "Aman"], label_visibility="collapsed")
+    with col_search:
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        search_q = st.text_input("🔍 Cari Barang (Nama / SKU):", placeholder="Ketik nama atau kode barang...", label_visibility="collapsed")
         
-        fig = px.bar(
-            daily_trx, 
-            x='tanggal', 
-            y='jumlah', 
-            color='jenis',
-            barmode='group',
-            color_discrete_map={'Masuk': '#2ca02c', 'Keluar': '#d32f2f'},
-            labels={'tanggal': 'Tanggal', 'jumlah': f'Volume ({satuan})', 'jenis': 'Jenis Transaksi'},
-            title=f"Grafik Volume Transaksi (Masuk vs Keluar) - {n_hari} Hari Terakhir"
-        )
-        fig.update_layout(xaxis_title="", yaxis_title="Jumlah", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(fig, use_container_width=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Apply Status Filter
+    if status_filter:
+        # Full DF concat order matches the status classes roughly, but it's better to explicitly check
+        # We can map the status back or just use the separate DFs
+        filtered_dfs = []
+        if "Krisis" in status_filter: filtered_dfs.append(krisis_df)
+        if "Minimum" in status_filter: filtered_dfs.append(mendekati_df)
+        if "Aman" in status_filter: filtered_dfs.append(aman_df)
+        if "Bahan Bebas" in status_filter: filtered_dfs.append(bebas_df)
+        
+        full_df = pd.concat(filtered_dfs).sort_values(by='persentase') if filtered_dfs else pd.DataFrame(columns=full_df.columns)
     else:
-        st.info(f"Tidak ada aktivitas pergerakan stok untuk {nama_brg} dalam {n_hari} hari terakhir.")
+        full_df = pd.DataFrame(columns=full_df.columns)
         
-    with st.expander(f"Tampilkan Tabel Riwayat ({n_hari} Hari Terakhir)", expanded=True):
-        if 'tanggal_dt' in df_trx_filtered.columns:
-            display_df = df_trx_filtered.drop(columns=['tanggal_dt']).sort_values(by='tanggal', ascending=False)
+    # Apply Supplier Filter
+    if sup_filter:
+        if not hist_masuk.empty and 'supplier' in hist_masuk.columns:
+            items_from_sups = hist_masuk[hist_masuk['supplier'].isin(sup_filter)]['nama_barang'].unique()
+            full_df = full_df[full_df['nama_barang'].isin(items_from_sups)]
         else:
-            display_df = df_trx_filtered.sort_values(by='tanggal', ascending=False)
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+            full_df = full_df.iloc[0:0]
+            
+    if search_q:
+        full_df = full_df[
+            full_df['nama_barang'].str.contains(search_q, case=False, na=False) | 
+            full_df['kode_barang'].str.contains(search_q, case=False, na=False)
+        ]
+        
+    if len(full_df) == 0:
+        if search_q:
+            st.info(f"Pencarian '{search_q}' tidak ditemukan.")
+        else:
+            st.success("✅ **Semua Stok Aman!** Tidak ada barang yang tercatat.")
+    else:
+        h_col1, h_col2, h_col3 = st.columns([2, 2, 1.5])
+        with h_col1: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>DETAIL BARANG & SKU</span>", unsafe_allow_html=True)
+        with h_col2: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>LEVEL STOK SAAT INI</span>", unsafe_allow_html=True)
+        with h_col3: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>STATUS & ESTIMASI</span>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin-top: 5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+        
+        for _, row in full_df.iterrows():
+            stok = row['stok_sekarang']
+            minimum = row['stok_minimum']
+            pct = row['persentase']
+            kat = row.get('kategori', '')
+            status_flag = str(row.get('status', 'True')).upper() in ['TRUE', '1', 'YES', 'T']
+            
+            status_text, color_hex, bg_color, text_color, icon, estimasi = classify_stock_status(stok, minimum, pct, kat, status=status_flag)
+            bar_width = calculate_bar_width(stok, minimum)
+            
+            c1_html, c2_html, c3_html = get_row_html(
+                row['nama_barang'], row['kode_barang'], stok, row['satuan'], 
+                minimum, bar_width, status_text, color_hex, bg_color, text_color, icon, estimasi
+            )
+            
+            with st.container():
+                c1, c2, c3 = st.columns([2, 2, 1.5])
+                with c1: st.markdown(c1_html, unsafe_allow_html=True)
+                with c2: st.markdown(c2_html, unsafe_allow_html=True)
+                with c3: st.markdown(c3_html, unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 0; padding: 0;'>", unsafe_allow_html=True)

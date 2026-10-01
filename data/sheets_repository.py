@@ -7,61 +7,76 @@ import logging
 # Configure logger
 logger = logging.getLogger(__name__)
 
-MASTER_CSV = "master_barang"
-TRANSAKSI_CSV = "transaksi"
+# Constants for sheet names
+SHEET_MASTER = "master_barang"
+SHEET_STOK_MASUK = "stok_masuk"
+SHEET_PENGELUARAN_PASIEN = "pengeluaran_pasien"
+SHEET_PENGELUARAN_DOKTER = "pengeluaran_dokter"
+SHEET_PENGELUARAN_MANAJEMEN = "pengeluaran_manajemen"
+SHEET_MASTER_DOKTER = "master_dokter"
 
-@st.cache_data(ttl=60)
-def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+SHEET_LOG = "log"
+
+# Backward compatibility aliases
+MASTER_CSV = SHEET_MASTER
+TRANSAKSI_CSV = SHEET_LOG
+
+@st.cache_resource
+def get_gspread_client():
+    """Get authenticated gspread client (cached for session)"""
+    return gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_sheet_data(sheet_name: str) -> pd.DataFrame:
     """
-    Load data from Google Sheets, cached for performance.
-    
-    Returns:
-        tuple[pd.DataFrame, pd.DataFrame]: A tuple containing master_df and transaksi_df.
+    Load data from a specific Google Sheet tab, cached for performance.
     """
     try:
-        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        gc = get_gspread_client()
         sh = gc.open_by_url(st.secrets["google_sheets"]["url"])
+        ws = sh.worksheet(sheet_name)
+        df = pd.DataFrame(ws.get_all_records(numericise_ignore=["all"]))
         
-        ws_master = sh.worksheet(MASTER_CSV)
-        ws_transaksi = sh.worksheet(TRANSAKSI_CSV)
-        
-        master_df = pd.DataFrame(ws_master.get_all_records())
-        transaksi_df = pd.DataFrame(ws_transaksi.get_all_records())
-        
-        # Pastikan kolom numerik terbaca sebagai angka (bukan string)
-        if not master_df.empty:
-            master_df['stok_sekarang'] = pd.to_numeric(master_df['stok_sekarang'], errors='coerce').fillna(0)
-            master_df['stok_minimum'] = pd.to_numeric(master_df['stok_minimum'], errors='coerce').fillna(0)
-            
-        if not transaksi_df.empty and 'jumlah' in transaksi_df.columns:
-            transaksi_df['jumlah'] = pd.to_numeric(transaksi_df['jumlah'], errors='coerce').fillna(0)
-        
-        return master_df, transaksi_df
+        # Ensure common numeric columns are properly typed
+        if not df.empty:
+            numeric_cols = ['stok_sekarang', 'stok_minimal', 'stok_minimum', 'harga_master', 'qty', 'harga_real', 'total_harga']
+            for col in numeric_cols:
+                if col in df.columns:
+                    if df[col].dtype == object:
+                        df[col] = df[col].apply(lambda x: str(x).replace(',', '.') if isinstance(x, str) else x)
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                    
+        return df
     except Exception as e:
-        logger.error(f"Failed to load data from Google Sheets: {e}", exc_info=True)
-        st.error(f"Gagal memuat data dari Google Sheets: {e}")
-        st.info("Pastikan kredensial dan URL Spreadsheet di .streamlit/secrets.toml sudah benar!")
-        st.stop()
-        return pd.DataFrame(), pd.DataFrame()
+        logger.error(f"Failed to load data from sheet {sheet_name}: {e}", exc_info=True)
+        st.error(f"⚠️ Gagal memuat data dari tab '{sheet_name}'. Ini biasanya karena koneksi terputus atau batas limit Google Sheets. Silakan klik tombol **🔄 Refresh Data** di menu sebelah kiri.")
+        return pd.DataFrame()
 
 def save_data(df: pd.DataFrame, sheet_name: str) -> None:
     """
     Save dataframe to Google Sheets and clear cache.
-    
-    Args:
-        df (pd.DataFrame): The dataframe to save.
-        sheet_name (str): The name of the worksheet tab.
     """
     try:
-        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        gc = get_gspread_client()
         sh = gc.open_by_url(st.secrets["google_sheets"]["url"])
         ws = sh.worksheet(sheet_name)
         
-        ws.clear() # Clear existing data
-        set_with_dataframe(ws, df) # Write new data
+        # Clear existing content
+        ws.clear()
         
-        st.cache_data.clear()
-        logger.info(f"Successfully saved data to sheet: {sheet_name}")
+        # Write new dataframe
+        set_with_dataframe(ws, df)
+        
+        # Invalidate cache for this specific sheet
+        get_sheet_data.clear()
+        logger.info(f"Successfully saved data to {sheet_name} and cleared cache")
     except Exception as e:
-        logger.error(f"Failed to save data to Google Sheets ({sheet_name}): {e}", exc_info=True)
-        st.error(f"Gagal menyimpan ke Google Sheets: {e}")
+        logger.error(f"Failed to save data to {sheet_name}: {e}", exc_info=True)
+        st.error(f"Gagal menyimpan data ke Google Sheets ({sheet_name}): {e}")
+
+@st.cache_data(ttl=60, show_spinner=False)
+def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Backward compatibility function during migration to new schema"""
+    master_df = get_sheet_data(SHEET_MASTER)
+    transaksi_df = get_sheet_data(SHEET_LOG)
+    return master_df, transaksi_df
