@@ -115,6 +115,35 @@ def inject_custom_css():
             height: 0 !important;
         }
 
+        /* Card Rangkuman Belanja / Masuk di Laporan Harian (Aksen Hijau-Cream Elegan) */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.card-belanja-marker) {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 45%, #fefce8 100%) !important;
+            border: 1.5px solid #86efac !important;
+            box-shadow: 0 4px 18px rgba(16, 185, 129, 0.1) !important;
+            border-radius: 14px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.card-belanja-marker):hover {
+            box-shadow: 0 6px 24px rgba(16, 185, 129, 0.16) !important;
+            border-color: #4ade80 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.card-belanja-marker) h5 {
+            color: #166534 !important;
+            font-weight: 700 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.card-belanja-marker) div[data-testid="stMetricLabel"] {
+            color: #15803d !important;
+            font-weight: 700 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.card-belanja-marker) div[data-testid="stMetricValue"] {
+            color: #064e3b !important;
+        }
+        div[data-testid="stElementContainer"]:has(.card-belanja-marker) {
+            display: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 0 !important;
+        }
+
         /* Input Fields Styling */
         div[data-baseweb="input"], div[data-baseweb="select"], div[data-baseweb="base-input"] {
             border-radius: 8px !important;

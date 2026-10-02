@@ -23,7 +23,7 @@ def show_analisis_stok():
     krisis_df, mendekati_df, aman_df, bebas_df = filter_stock_by_status(master_df)
     
     # Scorecards
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         with st.container(border=True):
             st.markdown("🏢 **Total Barang**")
@@ -40,19 +40,19 @@ def show_analisis_stok():
         with st.container(border=True):
             st.markdown("✅ **Stok Aman**")
             st.markdown(f"<h2 style='color:#388e3c'>{len(aman_df)} <span style='font-size:16px; opacity: 0.7;'>SKU</span></h2>", unsafe_allow_html=True)
-    with col5:
-        with st.container(border=True):
-            st.markdown("🍲 **Bahan Bebas**")
-            st.markdown(f"<h2 style='color:#1976d2'>{len(bebas_df)} <span style='font-size:16px; opacity: 0.7;'>SKU</span></h2>", unsafe_allow_html=True)
+    # with col5:
+    #     with st.container(border=True):
+    #         st.markdown("🍲 **Bahan Bebas**")
+    #         st.markdown(f"<h2 style='color:#1976d2'>{len(bebas_df)} <span style='font-size:16px; opacity: 0.7;'>SKU</span></h2>", unsafe_allow_html=True)
             
     st.markdown("---")
     
     # --- DAFTAR SELURUH STOK BARANG ---
     full_df = pd.concat([krisis_df, mendekati_df, aman_df, bebas_df]).sort_values(by='persentase')
     
-    col_title, col_sup, col_filter, col_search = st.columns([1, 1, 1, 1])
-    with col_title:
-        st.markdown(get_header_html(len(full_df)), unsafe_allow_html=True)
+    col_sup, col_filter, col_search = st.columns([1, 1, 1])
+    # with col_title:
+    #     st.markdown(get_header_html(len(full_df)), unsafe_allow_html=True)
     with col_sup:
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
         hist_masuk = get_sheet_data(SHEET_STOK_MASUK)

@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 import time
 from data.sheets_repository import load_data, save_data, MASTER_CSV, TRANSAKSI_CSV, SHEET_MASTER_DOKTER, get_sheet_data
+from views.transaksi import extract_unique_suppliers, match_supplier
 
 def safe_float(val):
     try:
@@ -46,40 +47,64 @@ def show_master_barang():
     
     master_df, _ = load_data()
     
+    if 'harga_real' not in master_df.columns:
+        master_df['harga_real'] = master_df['harga_master'].copy() if 'harga_master' in master_df.columns else 0.0
+        
     if 'status' not in master_df.columns:
         master_df['status'] = True
     else:
         # Normalize to boolean for the editor
         master_df['status'] = master_df['status'].astype(str).str.upper().isin(['TRUE', '1', 'YES', 'T'])
         
-    # Filter Kategori / Filter Cepat (Mirip Dashboard Utama)
+    # 1. Filter Supplier & Filter Pencarian
+    col_sup, col_search = st.columns([1.5, 2.5])
+    with col_sup:
+        supp_list = extract_unique_suppliers(master_df)
+        sup_options = ["Semua Supplier"] + supp_list
+        selected_sup = st.selectbox("🏢 Filter Supplier:", sup_options, index=0, key="master_sup_filter")
+    with col_search:
+        search_q = st.text_input("🔍 Cari Nama / Kode Barang:", placeholder="Ketik nama atau kode barang...", key="master_search_input")
+        
+    if selected_sup != "Semua Supplier" and 'supplier' in master_df.columns:
+        df_by_sup = master_df[master_df['supplier'].apply(lambda x: match_supplier(x, selected_sup))].copy()
+    else:
+        df_by_sup = master_df.copy()
+        
+    # 2. Filter Kategori / Filter Cepat (Mirip Dashboard Utama)
     if 'kategori' in master_df.columns:
         categories = master_df['kategori'].dropna().unique().tolist()
         categories = [c for c in categories if str(c).strip() != '']
     else:
         categories = []
 
-    available_items = master_df['nama_barang'].tolist() if 'nama_barang' in master_df.columns else []
-    cat_options = [f"Semua ({len(master_df)})", "Khusus Dokter", "Khusus Manajemen"]
+    available_items = df_by_sup['nama_barang'].tolist() if 'nama_barang' in df_by_sup.columns else []
+    cat_options = [f"Semua ({len(df_by_sup)})", "Khusus Dokter", "Khusus Manajemen"]
     for c in categories:
-        count = len(master_df[master_df['kategori'] == c])
+        count = len(df_by_sup[df_by_sup['kategori'] == c])
         cat_options.append(f"{c} ({count})")
 
-    selected_cat = st.pills("KATEGORI / FILTER CEPAT:", cat_options, default=cat_options[0], key="master_cat_pills")
+    selected_cat = st.pills("KATEGORI / FILTER CEPAT:", cat_options, default=cat_options[0], key=f"master_cat_pills_{selected_sup}")
 
     if selected_cat == "Khusus Dokter":
         target_items = ["Roti", "Buah (Dokter)", "Telur Rebus", "Snack (Dokter)", "Le Minerale 600 ml", "Kopi KA", "Kopi 3 in 1", "Pocari", "Buavita", "Teh", "Oxy", "Buah (Dr Edi)", "Snack (Dr Edi)", "tempe goreng", "gula DM", "Teh (ok)", "pop mie"]
         valid_items = find_matching_items(available_items, target_items)
-        df_to_edit = master_df[master_df['nama_barang'].isin(valid_items)].copy()
+        df_to_edit = df_by_sup[df_by_sup['nama_barang'].isin(valid_items)].copy()
     elif selected_cat == "Khusus Manajemen":
         target_items = ["Le Mineral 330", "Snack", "Roti", "Jus", "Cleo", "Buah (Dokter)"]
         valid_items = find_matching_items(available_items, target_items)
-        df_to_edit = master_df[master_df['nama_barang'].isin(valid_items)].copy()
+        df_to_edit = df_by_sup[df_by_sup['nama_barang'].isin(valid_items)].copy()
     elif selected_cat and not selected_cat.startswith("Semua"):
         real_cat = selected_cat.split(" (")[0]
-        df_to_edit = master_df[master_df['kategori'] == real_cat].copy()
+        df_to_edit = df_by_sup[df_by_sup['kategori'] == real_cat].copy()
     else:
-        df_to_edit = master_df.copy()
+        df_to_edit = df_by_sup.copy()
+
+    if search_q and not df_to_edit.empty:
+        search_mask = (
+            df_to_edit['nama_barang'].astype(str).str.contains(search_q, case=False, na=False) |
+            df_to_edit['kode_barang'].astype(str).str.contains(search_q, case=False, na=False)
+        )
+        df_to_edit = df_to_edit[search_mask].copy()
 
     col_head, col_exp = st.columns([3, 1])
     with col_head:
@@ -95,19 +120,33 @@ def show_master_barang():
             use_container_width=True
         )
         
-    st.info("💡 **Tips CRUD:** Anda bisa mengubah isi langsung di dalam sel tabel. Untuk menghapus baris, klik kolom paling kiri dari baris tersebut dan tekan tombol `Delete` di *keyboard* Anda. Anda juga bisa menambah baris di bagian paling bawah tabel.")
+    # st.info("💡 **Tips CRUD:** Anda bisa mengubah isi langsung di dalam sel tabel. Untuk menghapus baris, klik kolom paling kiri dari baris tersebut dan tekan tombol `Delete` di *keyboard* Anda. Anda juga bisa menambah baris di bagian paling bawah tabel.")
     
     edited_df = st.data_editor(
         df_to_edit, 
         use_container_width=True,
         hide_index=True,
         num_rows="dynamic",
-        key=f"master_editor_{selected_cat}",
+        key=f"master_editor_{selected_sup}_{selected_cat}",
         column_config={
+            "supplier": st.column_config.TextColumn(
+                "Supplier",
+                help="Nama supplier / vendor penyedia barang ini (bisa dipisah titik koma ';')"
+            ),
             "kategori": st.column_config.SelectboxColumn(
                 "Kategori",
                 options=["Bahan Basah", "Bahan Kering", "Alat"],
                 required=True,
+            ),
+            "harga_master": st.column_config.NumberColumn(
+                "HPP Master (Rp)",
+                help="Harga pokok acuan/standar master",
+                format="Rp %d"
+            ),
+            "harga_real": st.column_config.NumberColumn(
+                "Harga Real Terakhir (Rp)",
+                help="Harga beli riil dari stok masuk terakhir (digunakan untuk pengeluaran pasien)",
+                format="Rp %d"
             ),
             "status": st.column_config.CheckboxColumn(
                 "Status (Pantau Stok)",
@@ -133,11 +172,41 @@ def show_master_barang():
                         full_master_df['status'] = full_master_df['status'].astype(str).str.upper().isin(['TRUE', '1', 'YES', 'T'])
                         
                     new_trx_list = []
+                    used_indices = set()
                     
                     for _, row in edited_df.iterrows():
-                        kode = row['kode_barang']
-                        if kode in full_master_df['kode_barang'].values:
-                            old_row = full_master_df[full_master_df['kode_barang'] == kode].iloc[0]
+                        kode = str(row.get('kode_barang', '')).strip()
+                        sup = str(row.get('supplier', '')).strip().lower()
+                        nama = str(row.get('nama_barang', '')).strip().lower()
+                        
+                        # Cocokkan baris yang sesuai di full_master_df berdasarkan kode & supplier
+                        match_candidates = []
+                        if sup and 'supplier' in full_master_df.columns:
+                            match_candidates = full_master_df.index[
+                                (full_master_df['kode_barang'].astype(str).str.strip() == kode) &
+                                (full_master_df['supplier'].astype(str).str.strip().str.lower() == sup)
+                            ].tolist()
+                            if not match_candidates:
+                                match_candidates = full_master_df.index[
+                                    (full_master_df['nama_barang'].astype(str).str.strip().str.lower() == nama) &
+                                    (full_master_df['supplier'].astype(str).str.strip().str.lower() == sup)
+                                ].tolist()
+                        
+                        if not match_candidates:
+                            match_candidates = [
+                                i for i in full_master_df.index[
+                                    full_master_df['kode_barang'].astype(str).str.strip() == kode
+                                ].tolist() if i not in used_indices
+                            ]
+                            
+                        valid_matches = [i for i in match_candidates if i not in used_indices]
+                        if not valid_matches and match_candidates:
+                            valid_matches = match_candidates
+
+                        if valid_matches:
+                            idx = valid_matches[0]
+                            used_indices.add(idx)
+                            old_row = full_master_df.loc[idx]
                             
                             stok_new = safe_float(row.get('stok_sekarang', 0))
                             stok_old = safe_float(old_row.get('stok_sekarang', 0))
@@ -167,11 +236,10 @@ def show_master_barang():
                                     "tanggal": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                     "kategori": "Update Master",
                                     "kategori_freetext": "Admin",
-                                    "nama_barang": row['nama_barang'],
+                                    "nama_barang": row.get('nama_barang', ''),
                                     "keterangan": f"CRUD Update: {' | '.join(changes)}"
                                 })
                             # Update existing row in full_master_df
-                            idx = full_master_df.index[full_master_df['kode_barang'] == kode][0]
                             for col in edited_df.columns:
                                 if col in full_master_df.columns:
                                     full_master_df.at[idx, col] = row[col]
@@ -180,25 +248,58 @@ def show_master_barang():
                                 "tanggal": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                 "kategori": "Insert Master",
                                 "kategori_freetext": "Admin",
-                                "nama_barang": row['nama_barang'],
+                                "nama_barang": row.get('nama_barang', ''),
                                 "keterangan": "CRUD Insert: Barang baru ditambahkan"
                             })
                             full_master_df = pd.concat([full_master_df, pd.DataFrame([row])], ignore_index=True)
                             
                     # Check deletions ONLY within the items that were in df_to_edit
-                    deleted_kodes = []
+                    deleted_indices = []
+                    edited_signatures = set()
+                    for _, erow in edited_df.iterrows():
+                        e_k = str(erow.get('kode_barang', '')).strip()
+                        e_s = str(erow.get('supplier', '')).strip().lower()
+                        e_n = str(erow.get('nama_barang', '')).strip().lower()
+                        edited_signatures.add((e_k, e_s))
+                        edited_signatures.add((e_n, e_s))
+                        if not e_s:
+                            edited_signatures.add(e_k)
+
                     for _, old_row in df_to_edit.iterrows():
-                        if old_row['kode_barang'] not in edited_df['kode_barang'].values:
-                            deleted_kodes.append(old_row['kode_barang'])
-                            new_trx_list.append({
-                                "tanggal": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                "kategori": "Delete Master",
-                                "kategori_freetext": "Admin",
-                                "nama_barang": old_row['nama_barang'],
-                                "keterangan": "CRUD Delete: Barang dihapus dari sistem"
-                            })
-                    if deleted_kodes:
-                        full_master_df = full_master_df[~full_master_df['kode_barang'].isin(deleted_kodes)]
+                        o_k = str(old_row.get('kode_barang', '')).strip()
+                        o_s = str(old_row.get('supplier', '')).strip().lower()
+                        o_n = str(old_row.get('nama_barang', '')).strip().lower()
+                        
+                        is_present = (
+                            (o_k, o_s) in edited_signatures or
+                            (o_n, o_s) in edited_signatures or
+                            (not o_s and o_k in edited_signatures)
+                        )
+                        if not is_present:
+                            match_to_del = full_master_df.index[
+                                (full_master_df['kode_barang'].astype(str).str.strip() == o_k) &
+                                (full_master_df['supplier'].astype(str).str.strip().str.lower() == o_s)
+                            ].tolist()
+                            if not match_to_del:
+                                match_to_del = full_master_df.index[
+                                    (full_master_df['nama_barang'].astype(str).str.strip().str.lower() == o_n) &
+                                    (full_master_df['supplier'].astype(str).str.strip().str.lower() == o_s)
+                                ].tolist()
+                            if not match_to_del and not o_s:
+                                match_to_del = full_master_df.index[
+                                    full_master_df['kode_barang'].astype(str).str.strip() == o_k
+                                ].tolist()
+                            if match_to_del:
+                                deleted_indices.extend(match_to_del)
+                                new_trx_list.append({
+                                    "tanggal": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    "kategori": "Delete Master",
+                                    "kategori_freetext": "Admin",
+                                    "nama_barang": old_row.get('nama_barang', ''),
+                                    "keterangan": f"CRUD Delete: Barang dihapus ({old_row.get('supplier', '-')})"
+                                })
+                    if deleted_indices:
+                        full_master_df = full_master_df.drop(index=list(set(deleted_indices))).reset_index(drop=True)
                             
                     if new_trx_list:
                         new_trx_df = pd.DataFrame(new_trx_list)
@@ -233,9 +334,10 @@ def show_master_barang():
     with st.container(border=True):
         st.caption("Gunakan formulir ini untuk menambah beberapa barang sekaligus.")
         
-        h1, h2, h3, hcat, h4, h5, h6, h7 = st.columns([1, 2, 1, 1.5, 1.5, 1, 1, 0.5])
+        h1, h2, hsup, h3, hcat, h4, h5, h6, h7 = st.columns([1, 1.8, 1.3, 0.9, 1.2, 1.2, 0.8, 0.8, 0.4])
         h1.caption("Kode *")
         h2.caption("Nama Barang *")
+        hsup.caption("Supplier")
         h3.caption("Satuan *")
         hcat.caption("Kategori *")
         h4.caption("Harga (Rp) *")
@@ -244,12 +346,14 @@ def show_master_barang():
         
         row_data = []
         for row_id in st.session_state[st_key]:
-            c1, c2, c3, ccat, c4, c5, c6, c7 = st.columns([1, 2, 1, 1.5, 1.5, 1, 1, 0.5])
+            c1, c2, csup, c3, ccat, c4, c5, c6, c7 = st.columns([1, 1.8, 1.3, 0.9, 1.2, 1.2, 0.8, 0.8, 0.4])
             
             with c1:
                 kode_brg = st.text_input("Kode", key=f"kode_{row_id}", label_visibility="collapsed")
             with c2:
                 nama_brg = st.text_input("Nama", key=f"nama_{row_id}", label_visibility="collapsed")
+            with csup:
+                sup_brg = st.text_input("Supplier", key=f"sup_{row_id}", placeholder="Supplier...", label_visibility="collapsed")
             with c3:
                 sat_brg = st.selectbox("Satuan", unique_satuan, key=f"sat_{row_id}", label_visibility="collapsed")
             with ccat:
@@ -265,8 +369,11 @@ def show_master_barang():
                 
             row_data.append({
                 'kode_barang': kode_brg, 'nama_barang': nama_brg, 
+                'supplier': sup_brg,
                 'kategori': kat_brg, 'satuan': sat_brg, 
-                'harga_master': harga_brg, 'stok_minimum': stok_min, 
+                'harga_master': harga_brg,
+                'harga_real': harga_brg,
+                'stok_minimum': stok_min, 
                 'stok_sekarang': stok_skrg,
                 'status': True
             })
@@ -286,7 +393,7 @@ def show_master_barang():
                 if not r['kode_barang'] or not r['nama_barang']:
                     errors.append(f"Baris ke-{idx+1}: Kode dan Nama Barang harus diisi.")
                     continue
-                is_valid, error_msg = validate_new_item(r['kode_barang'], r['nama_barang'], master_df)
+                is_valid, error_msg = validate_new_item(r['kode_barang'], r['nama_barang'], master_df, r.get('supplier', ''))
                 if not is_valid:
                     errors.append(f"Baris ke-{idx+1}: {error_msg}")
                     continue

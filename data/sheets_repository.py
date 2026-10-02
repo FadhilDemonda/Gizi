@@ -40,7 +40,20 @@ def get_sheet_data(sheet_name: str) -> pd.DataFrame:
         
         # Ensure common numeric columns are properly typed
         if not df.empty:
-            numeric_cols = ['stok_sekarang', 'stok_minimal', 'stok_minimum', 'harga_master', 'qty', 'harga_real', 'total_harga']
+            if sheet_name == SHEET_MASTER and 'harga_real' not in df.columns:
+                df['harga_real'] = df['harga_master'].copy() if 'harga_master' in df.columns else 0.0
+                
+            if sheet_name == SHEET_STOK_MASUK:
+                if 'sisa_qty' not in df.columns:
+                    df['sisa_qty'] = df['qty'].copy() if 'qty' in df.columns else 0.0
+                else:
+                    df['sisa_qty'] = pd.to_numeric(df['sisa_qty'].apply(lambda x: str(x).replace(',', '.') if isinstance(x, str) else x), errors='coerce')
+                    if 'qty' in df.columns:
+                        df['sisa_qty'] = df['sisa_qty'].fillna(df['qty'])
+                    else:
+                        df['sisa_qty'] = df['sisa_qty'].fillna(0.0)
+                
+            numeric_cols = ['stok_sekarang', 'stok_minimal', 'stok_minimum', 'harga_master', 'qty', 'harga_real', 'total_harga', 'sisa_qty']
             for col in numeric_cols:
                 if col in df.columns:
                     if df[col].dtype == object:

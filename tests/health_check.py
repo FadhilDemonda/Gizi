@@ -367,6 +367,7 @@ def test_python_imports():
         ("views.pengeluaran_common", "views/pengeluaran_common.py"),
         ("views.laporan_harian", "views/laporan_harian.py"),
         ("views.analisis_stok", "views/analisis_stok.py"),
+        ("views.riwayat_pengeluaran", "views/riwayat_pengeluaran.py"),
     ]
     for mod_name, file_path in modules:
         full_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), file_path)

@@ -6,8 +6,13 @@ from utils.state import init_session_state
 from views.dashboard import show_dashboard
 from views.master_barang import show_master_barang
 from views.master_dokter import show_master_dokter
-from views.transaksi import show_transaksi
-from views.pengeluaran import show_pengeluaran_pasien, show_pengeluaran_dokter, show_pengeluaran_manajemen
+from views.transaksi import show_transaksi, show_riwayat_harga
+from views.pengeluaran import (
+    show_pengeluaran_pasien, 
+    show_pengeluaran_dokter, 
+    show_pengeluaran_manajemen,
+    show_riwayat_pengeluaran
+)
 from views.laporan_harian import show_laporan_harian
 from views.analisis_stok import show_analisis_stok
 
@@ -97,9 +102,18 @@ def main():
     if kategori_menu == "📊 Analitik & Laporan":
         menu = st.sidebar.radio("Halaman:", ["Dashboard Utama", "Analisis Stok", "Laporan Harian"])
     elif kategori_menu == "📦 Input & Transaksi":
-        menu = st.sidebar.radio("Halaman:", ["Input Stok Masuk", "Pengeluaran Pasien", "Pengeluaran Dokter", "Pengeluaran Manajemen"])
+        menu = st.sidebar.radio("Halaman:", [
+            "Input Stok Masuk", 
+            "Pengeluaran Pasien", 
+            "Pengeluaran Dokter", 
+            "Pengeluaran Manajemen"
+        ])
     elif kategori_menu == "⚙️ Pengaturan Data":
-        menu = st.sidebar.radio("Halaman:", ["Master Barang", "Master Dokter"])
+        menu = st.sidebar.radio("Halaman:", [
+            "Master Barang", 
+            "Master Dokter",
+            "Riwayat Pengeluaran & Harga"
+        ])
     
     st.sidebar.markdown("---")
     
@@ -130,6 +144,8 @@ def main():
         render_page_safely(show_analisis_stok, "Analisis Stok")
     elif menu == "Input Stok Masuk":
         render_page_safely(show_transaksi, "Input Stok Masuk")
+    elif menu in ["Riwayat Pengeluaran & Harga", "Input Riwayat Pengeluaran", "Input Riwayat Harga", "Riwayat Pengeluaran"]:
+        render_page_safely(show_riwayat_pengeluaran, "Riwayat Pengeluaran & Harga")
     elif menu == "Pengeluaran Pasien":
         render_page_safely(show_pengeluaran_pasien, "Pengeluaran Pasien")
     elif menu == "Pengeluaran Dokter":

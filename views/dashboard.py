@@ -7,84 +7,102 @@ from data.sheets_repository import (
     SHEET_PENGELUARAN_PASIEN, SHEET_PENGELUARAN_DOKTER, SHEET_PENGELUARAN_MANAJEMEN
 )
 
+from views.transaksi import extract_unique_suppliers, match_supplier
+
 @st.dialog("Pilih Banyak Barang Sekaligus 🛒")
-def dashboard_item_selector_dialog(master_df, available_items, current_items):
-    if current_items is None: current_items = []
+def dashboard_item_selector_dialog(master_df, current_items=None, default_supplier=None):
+    if current_items is None: 
+        current_items = []
     st.markdown("Filter & pilih barang-barang yang ingin dianalisis:")
     
+    # 1. Filter Supplier
+    supp_list = extract_unique_suppliers(master_df)
+    supp_options = ["Semua Supplier"] + supp_list
+    
+    default_supp_idx = 0
+    if default_supplier and default_supplier in supp_list:
+        default_supp_idx = supp_options.index(default_supplier)
+        
+    c_f1, c_f2 = st.columns([1.3, 1.7])
+    with c_f1:
+        selected_supplier = st.selectbox(
+            "🏢 Filter Supplier:",
+            supp_options,
+            index=default_supp_idx,
+            key="dash_dlg_supp_filter"
+        )
+    with c_f2:
+        search_q = st.text_input("🔍 Cari Barang:", placeholder="Ketik nama atau kode barang...", key="dash_dlg_search_input")
+
+    # Filter berdasarkan Supplier
+    if selected_supplier and selected_supplier != "Semua Supplier" and 'supplier' in master_df.columns:
+        supplier_df = master_df[master_df['supplier'].apply(lambda x: match_supplier(x, selected_supplier))]
+    else:
+        supplier_df = master_df
+
+    # 2. Filter Kategori (Bahan Basah, Bahan Kering, Alat, dll)
     if 'kategori' in master_df.columns:
         categories = master_df['kategori'].dropna().unique().tolist()
         categories = [c for c in categories if str(c).strip() != '']
         
-        cat_options = [f"Semua ({len(available_items)})", "Khusus Dokter", "Khusus Manajemen"]
+        uniq_sup_items = supplier_df['nama_barang'].dropna().unique().tolist()
+        cat_options = [f"Semua ({len(uniq_sup_items)})"]
         for c in categories:
-            count = len([x for x in available_items if x in master_df[master_df['kategori'] == c]['nama_barang'].tolist()])
+            count = len(supplier_df[supplier_df['kategori'] == c]['nama_barang'].dropna().unique())
             cat_options.append(f"{c} ({count})")
             
-        selected_cat = st.pills("KATEGORI / FILTER CEPAT:", cat_options, default=cat_options[0])
+        selected_cat = st.pills("KATEGORI:", cat_options, default=cat_options[0], key=f"dash_dlg_cat_pills_{selected_supplier}")
         
-        if selected_cat in ["Khusus Dokter", "Khusus Manajemen"]:
-            if selected_cat == "Khusus Dokter":
-                target_items = ["Roti", "Buah (Dokter)", "Telur Rebus", "Snack (Dokter)", "Le Minerale 600 ml", "Kopi KA", "Kopi 3 in 1", "Pocari", "Buavita", "Teh", "Oxy", "Buah (Dr Edi)", "Snack (Dr Edi)", "tempe goreng", "gula DM", "Teh (ok)", "pop mie"]
-            else:
-                target_items = ["Le Mineral 330", "Snack", "Roti", "Jus", "Cleo", "Buah (Dokter)"]
-                
-            valid_items = []
-            for ti in target_items:
-                match = None
-                for item in available_items:
-                    if str(item).lower().strip() == ti.lower().strip(): match = item; break
-                if not match:
-                    for item in available_items:
-                        if str(item).lower().strip().startswith(ti.lower().strip()): match = item; break
-                if not match:
-                    for item in available_items:
-                        if ti.lower().strip() in str(item).lower().strip(): match = item; break
-                if match and match not in valid_items:
-                    valid_items.append(match)
-            filtered_items = valid_items
-        elif selected_cat and not selected_cat.startswith("Semua"):
+        if selected_cat and not selected_cat.startswith("Semua"):
             real_cat = selected_cat.split(" (")[0]
-            cat_items = master_df[master_df['kategori'] == real_cat]['nama_barang'].tolist()
-            filtered_items = [x for x in available_items if x in cat_items]
+            filtered_df = supplier_df[supplier_df['kategori'] == real_cat]
         else:
-            filtered_items = available_items
+            filtered_df = supplier_df
     else:
-        filtered_items = available_items
+        filtered_df = supplier_df
+        
+    # 3. Filter Pencarian Nama Barang
+    if search_q:
+        filtered_df = filtered_df[filtered_df['nama_barang'].str.contains(search_q, case=False, na=False, regex=False)]
+        
+    filtered_df = filtered_df.drop_duplicates(subset=['nama_barang'])
+    filtered_items = [str(x).strip() for x in filtered_df['nama_barang'].dropna().unique() if str(x).strip()]
         
     if 'dash_dialog_set' not in st.session_state:
         st.session_state['dash_dialog_set'] = set(current_items)
             
-    search_q = st.text_input("🔍 Cari Barang:", placeholder="Ketik nama atau kode barang...", label_visibility="collapsed")
-    if search_q:
-        filtered_items = [x for x in filtered_items if search_q.lower() in x.lower()]
-        
     st.markdown(f"<div style='font-size:0.85rem; color:gray; font-weight:600;'>Ringkasan Terpilih: {len(st.session_state['dash_dialog_set'])} barang secara keseluruhan</div>", unsafe_allow_html=True)
     
     c_btn1, c_btn2 = st.columns(2)
     with c_btn1:
-        if st.button("☑️ Pilih Semua (Filter Saat Ini)", use_container_width=True):
+        if st.button("☑️ Pilih Semua (Filter Saat Ini)", use_container_width=True, key="dash_dlg_sel_all"):
             st.session_state['dash_dialog_set'].update(filtered_items)
+            st.rerun()
     with c_btn2:
-        if st.button("🔲 Kosongkan Semua", use_container_width=True):
+        if st.button("🔲 Kosongkan Semua", use_container_width=True, key="dash_dlg_clr_all"):
             st.session_state['dash_dialog_set'].clear()
+            st.rerun()
             
     new_dialog_set = set([x for x in st.session_state['dash_dialog_set'] if x not in filtered_items])
     
     with st.container(height=350, border=True):
         if not filtered_items:
-            st.info("Tidak ada barang.")
+            st.info("Tidak ada barang yang cocok dengan filter.")
         else:
             cols = st.columns(3)
             for i, item in enumerate(filtered_items):
                 with cols[i % 3]:
-                    is_checked = st.checkbox(item, value=(item in st.session_state['dash_dialog_set']))
+                    is_checked = st.checkbox(
+                        item, 
+                        value=(item in st.session_state['dash_dialog_set']),
+                        key=f"chk_dash_dlg_{i}_{item}"
+                    )
                     if is_checked:
                         new_dialog_set.add(item)
                         
     st.session_state['dash_dialog_set'] = new_dialog_set
     
-    if st.button("➕ Terapkan Pilihan", type="primary", use_container_width=True):
+    if st.button("➕ Terapkan Pilihan", type="primary", use_container_width=True, key="dash_dlg_apply"):
         st.session_state['dash_selected_items'] = list(st.session_state['dash_dialog_set'])
         del st.session_state['dash_dialog_set']
         st.rerun()
@@ -97,45 +115,38 @@ def show_dashboard():
     if master_df.empty:
         st.warning("Data Master Barang tidak ditemukan.")
         return
-    df_masuk_filter = get_sheet_data(SHEET_STOK_MASUK)
-    
-    col_sup, col_item, col_date = st.columns([1, 1.5, 1.5])
+        
+    col_sup, col_item, col_date = st.columns([1.2, 1.5, 1.5])
     
     with col_sup:
-        available_sups = ["Pak Urip", "Wahana", "Ari Snack", "Supplier Yulia", "Roti Mayestik"]
-        if not df_masuk_filter.empty:
-            if 'supplier' not in df_masuk_filter.columns:
-                df_masuk_filter['supplier'] = df_masuk_filter['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
-            else:
-                df_masuk_filter['supplier'] = df_masuk_filter.apply(
-                    lambda row: row['keterangan'].split('| Supplier:')[1].split('|')[0].strip()
-                    if (pd.isna(row['supplier']) or str(row['supplier']).strip() in ['', 'Unknown']) and '| Supplier:' in str(row['keterangan'])
-                    else row['supplier'],
-                    axis=1
-                )
-            extra_sups = [s for s in df_masuk_filter['supplier'].dropna().unique() if s not in available_sups and str(s).strip() != '']
-            available_sups.extend(extra_sups)
-            
-        sup_filter = st.multiselect("🏢 Filter Supplier:", available_sups, placeholder="Semua Supplier")
+        all_dfs_sup = [master_df, get_sheet_data(SHEET_STOK_MASUK), get_sheet_data(SHEET_PENGELUARAN_PASIEN), get_sheet_data(SHEET_PENGELUARAN_DOKTER), get_sheet_data(SHEET_PENGELUARAN_MANAJEMEN)]
+        supp_list = extract_unique_suppliers(pd.concat([d for d in all_dfs_sup if not d.empty and isinstance(d, pd.DataFrame)], ignore_index=True))
+        sup_options = ["Semua Supplier"] + supp_list
+        selected_sup = st.selectbox("🏢 Filter Supplier:", sup_options, index=0, key="dash_main_sup")
         
-    item_list = master_df['nama_barang'].tolist()
-    if sup_filter and not df_masuk_filter.empty:
-        items_from_sups = df_masuk_filter[df_masuk_filter['supplier'].isin(sup_filter)]['nama_barang'].unique()
-        item_list = [item for item in item_list if item in items_from_sups]
+    if selected_sup != "Semua Supplier" and 'supplier' in master_df.columns:
+        filtered_master = master_df[master_df['supplier'].apply(lambda x: match_supplier(x, selected_sup))]
+    else:
+        filtered_master = master_df
         
+    item_list = [str(x).strip() for x in filtered_master['nama_barang'].dropna().unique() if str(x).strip()]
+    
     with col_item:
         st.markdown("<div style='margin-bottom: 2px; font-size: 14px;'>🔍 Pilih Barang untuk Dianalisis:</div>", unsafe_allow_html=True)
         
         if 'dash_selected_items' not in st.session_state:
             st.session_state['dash_selected_items'] = item_list.copy() if item_list else []
             
-        selected_items = st.session_state['dash_selected_items']
+        selected_items = [x for x in st.session_state['dash_selected_items'] if x in item_list]
+        if not selected_items and item_list:
+            selected_items = item_list.copy()
+            st.session_state['dash_selected_items'] = selected_items
         
         btn_label = f"🛒 Terpilih {len(selected_items)} Barang" if selected_items else "🔍 Pilih Barang..."
-        if st.button(btn_label, use_container_width=True):
-            if 'dash_dialog_init' in st.session_state:
-                del st.session_state['dash_dialog_init']
-            dashboard_item_selector_dialog(master_df, item_list, selected_items)
+        if st.button(btn_label, use_container_width=True, key="btn_open_dash_dialog"):
+            if 'dash_dialog_set' in st.session_state:
+                del st.session_state['dash_dialog_set']
+            dashboard_item_selector_dialog(master_df, selected_items, default_supplier=selected_sup)
         
     with col_date:
         today = datetime.date.today()
@@ -153,8 +164,12 @@ def show_dashboard():
     start_date, end_date = date_range
         
     # Summarize master info for selected items
-    selected_master = master_df[master_df['nama_barang'].isin(selected_items)]
-    total_stok_sekarang = selected_master['stok_sekarang'].sum()
+    selected_master = master_df[master_df['nama_barang'].isin(selected_items)].copy()
+    if selected_sup != "Semua Supplier" and 'supplier' in selected_master.columns:
+        selected_master = selected_master[selected_master['supplier'].apply(lambda x: match_supplier(x, selected_sup))]
+    
+    selected_master['stok_sekarang'] = pd.to_numeric(selected_master['stok_sekarang'], errors='coerce').fillna(0).clip(lower=0)
+    total_stok_sekarang = float(selected_master['stok_sekarang'].sum())
     
     st.markdown("---")
     
@@ -177,12 +192,47 @@ def show_dashboard():
     df_dokter = filter_by_date(df_dokter)
     df_manajemen = filter_by_date(df_manajemen)
     
+    def filter_dash_by_sup(df, target_sup):
+        if df.empty or target_sup == "Semua Supplier":
+            return df
+        target_clean = str(target_sup).strip().lower()
+        def check_row(row):
+            val = row.get('supplier')
+            if (pd.isna(val) or str(val).strip() in ['', 'Unknown', '-', 'nan', 'None']) and 'keterangan' in row and '| Supplier:' in str(row.get('keterangan', '')):
+                val = str(row['keterangan']).split('| Supplier:')[1].split('|')[0].strip()
+            if not val or pd.isna(val):
+                return False
+            val_str = str(val).strip().lower()
+            val_parts = [p.strip().lower() for p in val_str.split(';')]
+            return (target_clean in val_parts) or (target_clean == val_str)
+        return df[df.apply(check_row, axis=1)]
+
+    # Normalize supplier column in df_masuk if needed
+    if not df_masuk.empty and 'total_harga' in df_masuk.columns:
+        if 'supplier' not in df_masuk.columns:
+            df_masuk['supplier'] = df_masuk['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
+        else:
+            df_masuk['supplier'] = df_masuk.apply(
+                lambda row: row['keterangan'].split('| Supplier:')[1].split('|')[0].strip()
+                if (pd.isna(row['supplier']) or str(row['supplier']).strip() in ['', 'Unknown']) and '| Supplier:' in str(row['keterangan'])
+                else row['supplier'],
+                axis=1
+            )
+        df_masuk['supplier'] = df_masuk['supplier'].fillna('Unknown').replace('', 'Unknown')
+
     # FILTER BY ITEMS
     hist_masuk = df_masuk[df_masuk['nama_barang'].isin(selected_items)] if not df_masuk.empty and 'nama_barang' in df_masuk.columns else pd.DataFrame()
     hist_pasien = df_pasien[df_pasien['nama_barang'].isin(selected_items)] if not df_pasien.empty and 'nama_barang' in df_pasien.columns else pd.DataFrame()
     hist_dokter = df_dokter[df_dokter['nama_barang'].isin(selected_items)] if not df_dokter.empty and 'nama_barang' in df_dokter.columns else pd.DataFrame()
     hist_manajemen = df_manajemen[df_manajemen['nama_barang'].isin(selected_items)] if not df_manajemen.empty and 'nama_barang' in df_manajemen.columns else pd.DataFrame()
     
+    # FILTER BY SUPPLIER (Pengeluaran & Belanja)
+    if selected_sup != "Semua Supplier":
+        hist_masuk = filter_dash_by_sup(hist_masuk, selected_sup)
+        hist_pasien = filter_dash_by_sup(hist_pasien, selected_sup)
+        hist_dokter = filter_dash_by_sup(hist_dokter, selected_sup)
+        hist_manajemen = filter_dash_by_sup(hist_manajemen, selected_sup)
+
     # TAG THE SOURCES
     if not hist_pasien.empty: hist_pasien['Sumber'] = 'Pasien'
     if not hist_dokter.empty: hist_dokter['Sumber'] = 'Dokter'
@@ -195,19 +245,6 @@ def show_dashboard():
     if not hist_manajemen.empty: dfs_keluar.append(hist_manajemen)
     
     hist_keluar = pd.concat(dfs_keluar, ignore_index=True) if dfs_keluar else pd.DataFrame()
-    
-    # METRICS
-    if not hist_masuk.empty and 'total_harga' in hist_masuk.columns:
-        if 'supplier' not in hist_masuk.columns:
-            hist_masuk['supplier'] = hist_masuk['keterangan'].apply(lambda x: x.split('| Supplier:')[1].split('|')[0].strip() if '| Supplier:' in str(x) else 'Unknown')
-        else:
-            hist_masuk['supplier'] = hist_masuk.apply(
-                lambda row: row['keterangan'].split('| Supplier:')[1].split('|')[0].strip()
-                if (pd.isna(row['supplier']) or str(row['supplier']).strip() in ['', 'Unknown']) and '| Supplier:' in str(row['keterangan'])
-                else row['supplier'],
-                axis=1
-            )
-        hist_masuk['supplier'] = hist_masuk['supplier'].fillna('Unknown').replace('', 'Unknown')
 
     total_masuk = hist_masuk['qty'].sum() if not hist_masuk.empty else 0
     total_keluar_qty = hist_keluar['qty'].sum() if not hist_keluar.empty else 0
@@ -343,11 +380,10 @@ def show_dashboard():
 
     st.divider()
     
-    st.subheader("Beban Pengeluaran per Supplier (Belanja)")
+    st.subheader("📥 Total Belanja per Supplier (Stok Masuk)")
     if not hist_masuk.empty and 'total_harga' in hist_masuk.columns:
-        # Total per supplier (bukan per barang), limit max 25
         supplier_data = hist_masuk.groupby('supplier')['total_harga'].sum().reset_index()
-        supplier_data = supplier_data.sort_values(by='total_harga', ascending=False).head(25)
+        supplier_data = supplier_data.sort_values(by='total_harga', ascending=False).head(20)
         
         fig_sup = px.bar(
             supplier_data,
@@ -360,8 +396,8 @@ def show_dashboard():
         fig_sup.update_traces(texttemplate='Rp %{text:,.0f}', textposition='outside')
         fig_sup.update_layout(
             margin=dict(t=20, b=0, l=0, r=0),
-            xaxis_title="Supplier",
-            yaxis_title="Total Biaya Belanja (Rp)",
+            xaxis_title="",
+            yaxis_title="Biaya Belanja (Rp)",
             showlegend=False
         )
         st.plotly_chart(fig_sup, use_container_width=True)
@@ -410,10 +446,11 @@ def show_dashboard():
     
     with tab_rangkuman:
         # === BUILD THE SUMMARY TABLE ===
-        # 1. Total Qty (stok gudang)
-        summary_df = selected_master[['nama_barang', 'stok_sekarang']].copy()
+        # 1. Total Qty (stok gudang) - gabungkan per nama_barang agar baris tidak dobel
+        summary_master = selected_master.copy()
+        summary_master['stok_sekarang'] = pd.to_numeric(summary_master['stok_sekarang'], errors='coerce').fillna(0).clip(lower=0)
+        summary_df = summary_master.groupby('nama_barang', as_index=False)['stok_sekarang'].sum()
         summary_df.rename(columns={'nama_barang': 'BARANG', 'stok_sekarang': 'TOTAL QTY'}, inplace=True)
-        summary_df['TOTAL QTY'] = pd.to_numeric(summary_df['TOTAL QTY'], errors='coerce').fillna(0)
         
         # 2. Masuk metrics
         if not hist_masuk.empty:
@@ -472,17 +509,25 @@ def show_dashboard():
     
     with tab_masuk:
         if not hist_masuk.empty:
-            display_masuk = hist_masuk[['tanggal', 'shift', 'nama_barang', 'qty', 'harga_master', 'harga_real', 'keterangan']].copy()
+            cols_m = ['tanggal', 'shift', 'supplier', 'nama_barang', 'qty', 'harga_master', 'harga_real', 'total_harga', 'keterangan']
+            avail_m = [c for c in cols_m if c in hist_masuk.columns]
+            display_masuk = hist_masuk[avail_m].copy()
+            for c in ['harga_master', 'harga_real', 'total_harga']:
+                if c in display_masuk.columns:
+                    display_masuk[c] = display_masuk[c].apply(lambda x: f"Rp {float(x):,.0f}" if pd.notna(x) else "-")
             st.dataframe(display_masuk.sort_values('tanggal', ascending=False), use_container_width=True, hide_index=True)
         else:
-            st.info("Belum ada riwayat pembelian untuk barang terpilih.")
+            st.info("Belum ada riwayat pembelian untuk barang & supplier terpilih.")
             
     with tab_keluar:
         if not hist_keluar.empty:
-            cols_to_show = ['tanggal', 'Sumber', 'nama_barang', 'kategori', 'kategori_freetext', 'qty', 'keterangan']
+            cols_to_show = ['tanggal', 'Sumber', 'supplier', 'nama_barang', 'kategori', 'kategori_freetext', 'qty', 'total_harga', 'keterangan']
             if 'jumlah_pasien' in hist_keluar.columns:
-                cols_to_show.insert(5, 'jumlah_pasien')
-            display_keluar = hist_keluar[[c for c in cols_to_show if c in hist_keluar.columns]].copy()
+                cols_to_show.insert(7, 'jumlah_pasien')
+            avail_k = [c for c in cols_to_show if c in hist_keluar.columns]
+            display_keluar = hist_keluar[avail_k].copy()
+            if 'total_harga' in display_keluar.columns:
+                display_keluar['total_harga'] = display_keluar['total_harga'].apply(lambda x: f"Rp {float(x):,.0f}" if pd.notna(x) else "-")
             st.dataframe(display_keluar.sort_values('tanggal', ascending=False), use_container_width=True, hide_index=True)
         else:
-            st.info("Belum ada riwayat pemakaian untuk barang terpilih.")
+            st.info("Belum ada riwayat pemakaian untuk barang & supplier terpilih.")
