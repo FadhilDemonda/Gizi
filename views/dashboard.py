@@ -70,21 +70,41 @@ def dashboard_item_selector_dialog(master_df, current_items=None, default_suppli
         
     if 'dash_dialog_set' not in st.session_state:
         st.session_state['dash_dialog_set'] = set(current_items)
+        
+    for item in filtered_items:
+        k = f"dash_chk_{item}"
+        if k not in st.session_state:
+            st.session_state[k] = (item in st.session_state['dash_dialog_set'])
             
     st.markdown(f"<div style='font-size:0.85rem; color:gray; font-weight:600;'>Ringkasan Terpilih: {len(st.session_state['dash_dialog_set'])} barang secara keseluruhan</div>", unsafe_allow_html=True)
-    
+
+    def on_toggle_item(item_name):
+        if 'dash_dialog_set' not in st.session_state:
+            st.session_state['dash_dialog_set'] = set()
+        if st.session_state.get(f"dash_chk_{item_name}"):
+            st.session_state['dash_dialog_set'].add(item_name)
+        else:
+            st.session_state['dash_dialog_set'].discard(item_name)
+
+    def on_pilih_semua(items_list):
+        if 'dash_dialog_set' not in st.session_state:
+            st.session_state['dash_dialog_set'] = set()
+        st.session_state['dash_dialog_set'].update(items_list)
+        for it in items_list:
+            st.session_state[f"dash_chk_{it}"] = True
+
+    def on_kosongkan_semua():
+        st.session_state['dash_dialog_set'] = set()
+        for k in list(st.session_state.keys()):
+            if k.startswith("dash_chk_"):
+                st.session_state[k] = False
+
     c_btn1, c_btn2 = st.columns(2)
     with c_btn1:
-        if st.button("☑️ Pilih Semua (Filter Saat Ini)", use_container_width=True, key="dash_dlg_sel_all"):
-            st.session_state['dash_dialog_set'].update(filtered_items)
-            st.rerun()
+        st.button("☑️ Pilih Semua (Filter Saat Ini)", on_click=on_pilih_semua, args=(filtered_items,), use_container_width=True, key="dash_dlg_sel_all")
     with c_btn2:
-        if st.button("🔲 Kosongkan Semua", use_container_width=True, key="dash_dlg_clr_all"):
-            st.session_state['dash_dialog_set'].clear()
-            st.rerun()
-            
-    new_dialog_set = set([x for x in st.session_state['dash_dialog_set'] if x not in filtered_items])
-    
+        st.button("🔲 Kosongkan Semua", on_click=on_kosongkan_semua, use_container_width=True, key="dash_dlg_clr_all")
+
     with st.container(height=350, border=True):
         if not filtered_items:
             st.info("Tidak ada barang yang cocok dengan filter.")
@@ -92,20 +112,28 @@ def dashboard_item_selector_dialog(master_df, current_items=None, default_suppli
             cols = st.columns(3)
             for i, item in enumerate(filtered_items):
                 with cols[i % 3]:
-                    is_checked = st.checkbox(
+                    st.checkbox(
                         item, 
-                        value=(item in st.session_state['dash_dialog_set']),
-                        key=f"chk_dash_dlg_{i}_{item}"
+                        key=f"dash_chk_{item}",
+                        on_change=on_toggle_item,
+                        args=(item,)
                     )
-                    if is_checked:
-                        new_dialog_set.add(item)
-                        
-    st.session_state['dash_dialog_set'] = new_dialog_set
-    
-    if st.button("➕ Terapkan Pilihan", type="primary", use_container_width=True, key="dash_dlg_apply"):
-        st.session_state['dash_selected_items'] = list(st.session_state['dash_dialog_set'])
-        del st.session_state['dash_dialog_set']
-        st.rerun()
+                    
+    c_app1, c_app2 = st.columns([1.8, 1.2])
+    with c_app1:
+        if st.button("➕ Terapkan Pilihan", type="primary", use_container_width=True, key="dash_dlg_apply"):
+            st.session_state['dash_selected_items'] = list(st.session_state.get('dash_dialog_set', set()))
+            st.rerun()
+    with c_app2:
+        def on_direct_empty():
+            st.session_state['dash_selected_items'] = []
+            st.session_state['dash_dialog_set'] = set()
+            for k in list(st.session_state.keys()):
+                if k.startswith("dash_chk_"):
+                    st.session_state[k] = False
+        if st.button("🔲 Kosongkan & Terapkan", use_container_width=True, key="dash_dlg_empty_apply"):
+            on_direct_empty()
+            st.rerun()
 
 def show_dashboard():
     st.header("📊 Dashboard Utama")
@@ -134,18 +162,20 @@ def show_dashboard():
     with col_item:
         st.markdown("<div style='margin-bottom: 2px; font-size: 14px;'>🔍 Pilih Barang untuk Dianalisis:</div>", unsafe_allow_html=True)
         
-        if 'dash_selected_items' not in st.session_state:
+        # Inisialisasi daftar barang terpilih jika supplier berubah atau baru pertama kali dimuat
+        if 'last_dash_sup' not in st.session_state or st.session_state['last_dash_sup'] != selected_sup:
+            st.session_state['last_dash_sup'] = selected_sup
+            st.session_state['dash_selected_items'] = item_list.copy() if item_list else []
+        elif 'dash_selected_items' not in st.session_state:
             st.session_state['dash_selected_items'] = item_list.copy() if item_list else []
             
         selected_items = [x for x in st.session_state['dash_selected_items'] if x in item_list]
-        if not selected_items and item_list:
-            selected_items = item_list.copy()
-            st.session_state['dash_selected_items'] = selected_items
         
-        btn_label = f"🛒 Terpilih {len(selected_items)} Barang" if selected_items else "🔍 Pilih Barang..."
+        btn_label = f"🛒 Terpilih {len(selected_items)} Barang" if selected_items else "🔍 Pilih Barang (0 Terpilih)..."
         if st.button(btn_label, use_container_width=True, key="btn_open_dash_dialog"):
-            if 'dash_dialog_set' in st.session_state:
-                del st.session_state['dash_dialog_set']
+            st.session_state['dash_dialog_set'] = set(selected_items)
+            for it in item_list:
+                st.session_state[f"dash_chk_{it}"] = (it in st.session_state['dash_dialog_set'])
             dashboard_item_selector_dialog(master_df, selected_items, default_supplier=selected_sup)
         
     with col_date:

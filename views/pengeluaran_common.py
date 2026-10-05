@@ -274,14 +274,27 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
     
     st.markdown(f"<div style='font-size:0.85rem; color:gray; font-weight:600;'>Ringkasan Terpilih: {len(st.session_state[temp_key])} barang secara keseluruhan</div>", unsafe_allow_html=True)
     
+    ver_key = f"ver_{temp_key}"
+    if ver_key not in st.session_state:
+        st.session_state[ver_key] = 0
+    c_ver = st.session_state[ver_key]
+
     c_btn1, c_btn2 = st.columns(2)
     with c_btn1:
         if st.button("☑️ Pilih Semua (Filter Saat Ini)", use_container_width=True):
             st.session_state[temp_key].update(item_options)
+            for k in list(st.session_state.keys()):
+                if k.startswith(f"chk_multi_{state_items_key}_"):
+                    del st.session_state[k]
+            st.session_state[ver_key] = c_ver + 1
             st.rerun()
     with c_btn2:
         if st.button("🔲 Kosongkan Semua", use_container_width=True):
             st.session_state[temp_key].clear()
+            for k in list(st.session_state.keys()):
+                if k.startswith(f"chk_multi_{state_items_key}_"):
+                    del st.session_state[k]
+            st.session_state[ver_key] = c_ver + 1
             st.rerun()
             
     new_dialog_set = set([x for x in st.session_state[temp_key] if x not in item_options])
@@ -296,7 +309,7 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
                     is_checked = st.checkbox(
                         item, 
                         value=(item in st.session_state[temp_key]),
-                        key=f"chk_multi_{state_items_key}_{i}_{item}"
+                        key=f"chk_multi_{state_items_key}_{c_ver}_{i}_{item}"
                     )
                     if is_checked:
                         new_dialog_set.add(item)
@@ -305,6 +318,9 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
     
     if st.button("➕ Tambahkan ke Form", type="primary", use_container_width=True):
         selected = list(st.session_state[temp_key])
+        for k in list(st.session_state.keys()):
+            if k.startswith(f"chk_multi_{state_items_key}_"):
+                del st.session_state[k]
         del st.session_state[temp_key]
         items_to_add = [x for x in selected if x not in current_items]
         

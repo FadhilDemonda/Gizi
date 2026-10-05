@@ -129,13 +129,28 @@ def pilih_dokter_dialog(df_docs, state_doc_key, kategori):
         
     st.caption(f"Total terpilih: {len(st.session_state[temp_key])} dokter secara keseluruhan")
     
+    ver_key = f"ver_{temp_key}"
+    if ver_key not in st.session_state:
+        st.session_state[ver_key] = 0
+    doc_ver = st.session_state[ver_key]
+
     c_btn1, c_btn2 = st.columns(2)
     with c_btn1:
         if st.button("☑️ Pilih Semua", use_container_width=True):
             st.session_state[temp_key].update(docs_to_show)
+            for k in list(st.session_state.keys()):
+                if k.startswith("chk_doc_"):
+                    del st.session_state[k]
+            st.session_state[ver_key] = doc_ver + 1
+            st.rerun()
     with c_btn2:
         if st.button("🔲 Kosongkan", use_container_width=True):
             st.session_state[temp_key].clear()
+            for k in list(st.session_state.keys()):
+                if k.startswith("chk_doc_"):
+                    del st.session_state[k]
+            st.session_state[ver_key] = doc_ver + 1
+            st.rerun()
             
     new_dialog_set = set([x for x in st.session_state[temp_key] if x not in docs_to_show])
     
@@ -146,7 +161,7 @@ def pilih_dokter_dialog(df_docs, state_doc_key, kategori):
         cols = st.columns(2)
         for i, d in enumerate(docs_to_show):
             with cols[i % 2]:
-                is_checked = st.checkbox(d, value=(d in st.session_state[temp_key]), key=f"chk_doc_{i}_{d}")
+                is_checked = st.checkbox(d, value=(d in st.session_state[temp_key]), key=f"chk_doc_{doc_ver}_{i}_{d}")
                 if is_checked:
                     new_dialog_set.add(d)
                     
@@ -154,6 +169,9 @@ def pilih_dokter_dialog(df_docs, state_doc_key, kategori):
     
     if st.button("➕ Terapkan Pilihan", type="primary", use_container_width=True):
         st.session_state[state_doc_key] = list(st.session_state[temp_key])
+        for k in list(st.session_state.keys()):
+            if k.startswith("chk_doc_"):
+                del st.session_state[k]
         del st.session_state[temp_key]
         st.rerun()
 

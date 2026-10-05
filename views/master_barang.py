@@ -84,21 +84,43 @@ def show_master_barang():
         categories = []
 
     available_items = df_by_sup['nama_barang'].tolist() if 'nama_barang' in df_by_sup.columns else []
-    cat_options = [f"Semua ({len(df_by_sup)})", "Khusus Dokter", "Khusus Manajemen"]
+    
+    # Format terbaru: hiraukan paket virtual (Snack, Buah, Roti), fokus pada barang fisik riil
+    target_dokter = [
+        "Telur Rebus", "Le Minerale 600 ml", "Le Minerale 330 ml", 
+        "Kopi KA", "Kopi 3 In 1", "Pocari", "Buavita", 
+        "Teh", "Teh (ok)", "Oxy", "Bear Brand", "Yakult", 
+        "Puding", "Susu Ultra Mini", "Tempe Goreng", "Gula DM", "Pop Mie"
+    ]
+    target_manajemen = [
+        "Le Minerale 330 ml", "Le Mineral 330", "Jus", "Cleo 220 ml", "Cleo 240 ml", "Cleo"
+    ]
+
+    def is_snack_buah_roti(name):
+        nl = str(name).lower().strip()
+        return any(x in nl for x in ['snack', 'buah', 'roti'])
+
+    valid_dokter = [it for it in find_matching_items(available_items, target_dokter) if not is_snack_buah_roti(it)]
+    valid_manajemen = [it for it in find_matching_items(available_items, target_manajemen) if not is_snack_buah_roti(it)]
+
+    count_doc = len(df_by_sup[df_by_sup['nama_barang'].isin(valid_dokter)])
+    count_man = len(df_by_sup[df_by_sup['nama_barang'].isin(valid_manajemen)])
+
+    cat_options = [
+        f"Semua ({len(df_by_sup)})", 
+        f"Khusus Dokter ({count_doc})", 
+        f"Khusus Manajemen ({count_man})"
+    ]
     for c in categories:
         count = len(df_by_sup[df_by_sup['kategori'] == c])
         cat_options.append(f"{c} ({count})")
 
     selected_cat = st.pills("KATEGORI / FILTER CEPAT:", cat_options, default=cat_options[0], key=f"master_cat_pills_{selected_sup}")
 
-    if selected_cat == "Khusus Dokter":
-        target_items = ["Roti", "Buah (Dokter)", "Telur Rebus", "Snack (Dokter)", "Le Minerale 600 ml", "Kopi KA", "Kopi 3 in 1", "Pocari", "Buavita", "Teh", "Oxy", "Buah (Dr Edi)", "Snack (Dr Edi)", "tempe goreng", "gula DM", "Teh (ok)", "pop mie"]
-        valid_items = find_matching_items(available_items, target_items)
-        df_to_edit = df_by_sup[df_by_sup['nama_barang'].isin(valid_items)].copy()
-    elif selected_cat == "Khusus Manajemen":
-        target_items = ["Le Mineral 330", "Snack", "Roti", "Jus", "Cleo", "Buah (Dokter)"]
-        valid_items = find_matching_items(available_items, target_items)
-        df_to_edit = df_by_sup[df_by_sup['nama_barang'].isin(valid_items)].copy()
+    if selected_cat and selected_cat.startswith("Khusus Dokter"):
+        df_to_edit = df_by_sup[df_by_sup['nama_barang'].isin(valid_dokter)].copy()
+    elif selected_cat and selected_cat.startswith("Khusus Manajemen"):
+        df_to_edit = df_by_sup[df_by_sup['nama_barang'].isin(valid_manajemen)].copy()
     elif selected_cat and not selected_cat.startswith("Semua"):
         real_cat = selected_cat.split(" (")[0]
         df_to_edit = df_by_sup[df_by_sup['kategori'] == real_cat].copy()
