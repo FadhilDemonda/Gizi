@@ -26,15 +26,20 @@ def get_gspread_client():
     """Get authenticated gspread client (cached for session)"""
     return gspread.service_account_from_dict(st.secrets["gcp_service_account"])
 
-@st.cache_data(show_spinner=False)
+@st.cache_resource
+def get_spreadsheet():
+    """Get open spreadsheet instance (cached for session)"""
+    gc = get_gspread_client()
+    return gc.open_by_url(st.secrets["google_sheets"]["url"])
+
+@st.cache_data(show_spinner="⏳ Memuat data dari server cloud...")
 def get_sheet_data(sheet_name: str) -> pd.DataFrame:
     """
     Load data from a specific Google Sheet tab, cached for performance.
     Data is refreshed only upon page change or explicit submit/refresh.
     """
     try:
-        gc = get_gspread_client()
-        sh = gc.open_by_url(st.secrets["google_sheets"]["url"])
+        sh = get_spreadsheet()
         ws = sh.worksheet(sheet_name)
         df = pd.DataFrame(ws.get_all_records(numericise_ignore=["all"]))
         
@@ -71,8 +76,7 @@ def save_data(df: pd.DataFrame, sheet_name: str) -> None:
     Save dataframe to Google Sheets and immediately clear cache so fresh data is loaded.
     """
     try:
-        gc = get_gspread_client()
-        sh = gc.open_by_url(st.secrets["google_sheets"]["url"])
+        sh = get_spreadsheet()
         ws = sh.worksheet(sheet_name)
         
         # Clear existing content
