@@ -74,7 +74,7 @@ def render_page_safely(view_fn, page_name: str):
 
 def main():
     if os.path.exists(LOGO_PATH):
-        col_logo, col_txt = st.sidebar.columns([1, 3.2], vertical_alignment="center")
+        col_logo, col_txt = st.sidebar.columns([1, 3.2])
         with col_logo:
             st.image(LOGO_PATH, use_container_width=True)
         with col_txt:
