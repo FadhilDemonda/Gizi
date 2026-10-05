@@ -7,6 +7,28 @@ from data.sheets_repository import (
 )
 from views.transaksi import extract_unique_suppliers, match_supplier
 
+def format_qty(val) -> str:
+    """
+    Format kuantitas agar mendukung angka desimal hingga 0.05 tanpa kehilangan presisi,
+    sekaligus menghilangkan nol trailing untuk angka bulat.
+    Contoh:
+        0.05 -> '0.05'
+        0.07 -> '0.07'
+        7.8  -> '7.8'
+        10.0 -> '10'
+        1250.25 -> '1,250.25'
+    """
+    try:
+        if val is None or pd.isna(val):
+            return "0"
+        v = round(float(val), 2)
+        s = f"{v:,.2f}"
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s if s else "0"
+    except Exception:
+        return "0"
+
 def render_rekapan_pasien(df_pasien_in, start_date, end_date):
     st.subheader(f"🛏️ Tabel Rekapan Pengeluaran Pasien ({len(df_pasien_in)} Transaksi Mentah)")
     if df_pasien_in.empty:
@@ -39,7 +61,7 @@ def render_rekapan_pasien(df_pasien_in, start_date, end_date):
             "Kategori Kelas": kat,
             "Jml Pasien": f"{jml_pas:,.0f}",
             "Macam Bahan": f"{mc_brg} Macam",
-            "Total Qty": f"{q_sum:,.1f}",
+            "Total Qty": format_qty(q_sum),
             "Total Biaya": f"Rp {rp_sum:,.0f}",
             "Biaya / Pasien": f"Rp {cost_per_p:,.0f}",
             "_sort_tgl": tgl
@@ -56,7 +78,7 @@ def render_rekapan_pasien(df_pasien_in, start_date, end_date):
             avg_p = (b_rp / b_qty) if b_qty > 0 else 0
             brg_rows.append({
                 "Nama Bahan": brg,
-                "Total Qty": f"{b_qty:,.1f}",
+                "Total Qty": format_qty(b_qty),
                 "Harga Satuan Rata-rata": f"Rp {avg_p:,.0f}",
                 "Total Biaya": f"Rp {b_rp:,.0f}",
                 "_raw_rp": b_rp
@@ -102,14 +124,14 @@ def render_rekapan_dokter(df_dokter_in, start_date, end_date):
         mc_brg = grp['nama_barang'].nunique()
         q_sum = grp['qty'].sum()
         rp_sum = grp['total_harga'].sum()
-        rincian_snack = ", ".join([f"{r.nama_barang} ({r.qty:g})" for r in grp.itertuples()])
+        rincian_snack = ", ".join([f"{r.nama_barang} ({format_qty(r.qty)})" for r in grp.itertuples()])
         grouped_rows.append({
             "Tanggal": tgl,
             "Shift": shf,
             "Kategori": kat,
             "Nama Dokter": dok,
             "Macam Snack": f"{mc_brg} Macam",
-            "Total Qty": f"{q_sum:,.1f}",
+            "Total Qty": format_qty(q_sum),
             "Total Biaya": f"Rp {rp_sum:,.0f}",
             "Rincian Menu Snack": rincian_snack,
             "_sort_tgl": tgl
@@ -126,7 +148,7 @@ def render_rekapan_dokter(df_dokter_in, start_date, end_date):
             avg_p = (b_rp / b_qty) if b_qty > 0 else 0
             brg_rows.append({
                 "Nama Snack / Makanan": brg,
-                "Total Qty": f"{b_qty:,.1f}",
+                "Total Qty": format_qty(b_qty),
                 "Harga Satuan Rata-rata": f"Rp {avg_p:,.0f}",
                 "Total Biaya": f"Rp {b_rp:,.0f}",
                 "_raw_rp": b_rp
@@ -172,14 +194,14 @@ def render_rekapan_manajemen(df_manajemen_in, start_date, end_date):
         mc_brg = grp['nama_barang'].nunique()
         q_sum = grp['qty'].sum()
         rp_sum = grp['total_harga'].sum()
-        rincian_item = ", ".join([f"{r.nama_barang} ({r.qty:g})" for r in grp.itertuples()])
+        rincian_item = ", ".join([f"{r.nama_barang} ({format_qty(r.qty)})" for r in grp.itertuples()])
         grouped_rows.append({
             "Tanggal": tgl,
             "Shift": shf,
             "Kategori": kat,
             "Kegiatan / Keterangan": ket,
             "Macam Konsumsi": f"{mc_brg} Macam",
-            "Total Qty": f"{q_sum:,.1f}",
+            "Total Qty": format_qty(q_sum),
             "Total Biaya": f"Rp {rp_sum:,.0f}",
             "Rincian Konsumsi": rincian_item,
             "_sort_tgl": tgl
@@ -196,7 +218,7 @@ def render_rekapan_manajemen(df_manajemen_in, start_date, end_date):
             avg_p = (b_rp / b_qty) if b_qty > 0 else 0
             brg_rows.append({
                 "Nama Konsumsi / Barang": brg,
-                "Total Qty": f"{b_qty:,.1f}",
+                "Total Qty": format_qty(b_qty),
                 "Harga Satuan Rata-rata": f"Rp {avg_p:,.0f}",
                 "Total Biaya": f"Rp {b_rp:,.0f}",
                 "_raw_rp": b_rp
@@ -386,7 +408,7 @@ def show_laporan_harian():
         st.markdown('<span class="card-belanja-marker"></span>', unsafe_allow_html=True)
         st.markdown("##### 📥 Rangkuman Belanja / Masuk")
         m1, m2 = st.columns(2)
-        m1.metric("Total Qty Masuk", f"{total_masuk_qty:,.0f} Qty")
+        m1.metric("Total Qty Masuk", f"{format_qty(total_masuk_qty)} Qty")
         m2.metric("Total Pembelian (Rp)", f"Rp {total_masuk_rp:,.0f}")
         
     st.markdown("<br>", unsafe_allow_html=True)
@@ -471,6 +493,8 @@ def show_laporan_harian():
             # Format as string with thousands separators for Rp columns
             for col in rp_cols + ['Total Pengeluaran']:
                 display_df[col] = display_df[col].apply(lambda x: f"{x:,.0f}")
+            for col in qty_cols + (['Total Qty (Semua)'] if 'Total Qty (Semua)' in display_df.columns else []):
+                display_df[col] = display_df[col].apply(format_qty)
             
             st.dataframe(display_df, use_container_width=True, hide_index=True)
             
@@ -573,7 +597,7 @@ def show_laporan_harian():
             
             # Format number & currency
             display_rekap['Jumlah Barang'] = display_rekap['Jumlah Barang'].apply(lambda x: f"{x:,.0f} Macam")
-            display_rekap['Total Qty'] = display_rekap['Total Qty'].apply(lambda x: f"{x:,.0f}")
+            display_rekap['Total Qty'] = display_rekap['Total Qty'].apply(format_qty)
             display_rekap['Jumlah Harga Master'] = display_rekap['Jumlah Harga Master'].apply(lambda x: f"Rp {x:,.0f}")
             display_rekap['Jumlah Harga Beli Real'] = display_rekap['Jumlah Harga Beli Real'].apply(lambda x: f"Rp {x:,.0f}")
             display_rekap['Harga Total Semua'] = display_rekap['Harga Total Semua'].apply(lambda x: f"Rp {x:,.0f}")

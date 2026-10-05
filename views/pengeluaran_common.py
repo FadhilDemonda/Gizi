@@ -82,14 +82,25 @@ def get_item_suppliers(item_name, master_df, stok_masuk_df=None):
                 
     return item_sups
 
+def parse_qty(val, default=0.0):
+    if val is None or pd.isna(val):
+        return default
+    try:
+        if isinstance(val, (int, float)):
+            return float(val)
+        val_str = str(val).strip().replace(',', '.')
+        if "/" in val_str:
+            num, den = val_str.split("/")
+            return float(num) / float(den)
+        return float(val_str)
+    except Exception:
+        return default
+
 def get_pkg_qty(prefix, kategori, item, default_val=1.0):
     val = st.session_state.get(f"stored_{prefix}_qty_{kategori}_{item}")
     if val is None:
         val = st.session_state.get(f"{prefix}_qty_{kategori}_{item}")
-    try:
-        return float(val) if val is not None else default_val
-    except (ValueError, TypeError):
-        return default_val
+    return parse_qty(val, default_val)
 
 def get_pkg_sup(prefix, kategori, item, default_val="-"):
     val = st.session_state.get(f"stored_{prefix}_sup_{kategori}_{item}")
@@ -126,21 +137,33 @@ def get_prioritized_options(keywords, all_options):
 
 def format_pkg_summary(items, prefix, default_label, kategori, master_dict_by_name=None):
     if not items:
-        def_s = get_pkg_sup(prefix, kategori, default_label)
-        if (not def_s or def_s == "-") and master_dict_by_name:
-            def_s = resolve_pkg_supplier(default_label, def_s, master_dict_by_name)
-        return f"{default_label} [{def_s}]" if def_s and def_s != "-" else default_label
+        return "⚠️ Belum diatur"
     parts = []
+    
+    # Auto-resolve master_dict_by_name if not provided so satuan can always be retrieved
+    if master_dict_by_name is None:
+        try:
+            m_df = get_sheet_data(SHEET_MASTER)
+            if not m_df.empty:
+                master_dict_by_name = {str(r['nama_barang']).strip(): r.to_dict() for _, r in m_df.iterrows() if 'nama_barang' in r}
+        except Exception:
+            master_dict_by_name = {}
+
     for it in items:
         q = get_pkg_qty(prefix, kategori, it, 1.0)
         s = get_pkg_sup(prefix, kategori, it)
         if (not s or s == "-") and master_dict_by_name:
             s = resolve_pkg_supplier(it, s, master_dict_by_name)
         s_str = f" [{s}]" if s and s != "-" else ""
-        parts.append(f"{q:g}x {it}{s_str}")
+        sat_str = ""
+        if master_dict_by_name and it in master_dict_by_name:
+            sat_val = str(master_dict_by_name[it].get('satuan', '')).strip()
+            if sat_val and sat_val.lower() not in ['nan', 'none', '-']:
+                sat_str = f" ({sat_val})"
+        parts.append(f"{q:g}x {it}{sat_str}{s_str}")
     return ", ".join(parts)
 
-def render_pkg_config_column(title, emoji, items_options, selected_items, state_key, prefix, default_item, kategori, master_df, raw_suppliers, placeholder="Pilih item..."):
+def render_pkg_config_column(title, emoji, items_options, selected_items, state_key, prefix, default_item, kategori, master_df, raw_suppliers, placeholder="Pilih item...", key_suffix=""):
     st.markdown(f"**{emoji} {title}**")
     
     # 1. Deduplicate & clean options
@@ -165,24 +188,43 @@ def render_pkg_config_column(title, emoji, items_options, selected_items, state_
         f"Pilih {title}:",
         options=cleaned_options,
         default=valid_defaults,
-        key=f"input_{prefix}_{kategori}",
+        key=f"input_{prefix}_{kategori}{key_suffix}",
         placeholder=placeholder
     )
     st.session_state[state_key] = new_items
     if new_items:
+        # Buat dictionary satuan barang untuk lookup cepat
+        satuan_map = {}
+        if isinstance(master_df, pd.DataFrame) and not master_df.empty and 'nama_barang' in master_df.columns and 'satuan' in master_df.columns:
+            for _, r in master_df.iterrows():
+                nb = str(r['nama_barang']).strip()
+                st_val = str(r.get('satuan', '')).strip()
+                if nb and st_val and st_val.lower() not in ['nan', 'none', '-']:
+                    satuan_map[nb] = st_val
+
         for it in new_items:
             col_q, col_s = st.columns([1, 1.4])
             with col_q:
-                k_qty = f"{prefix}_qty_{kategori}_{it}"
+                k_qty = f"{prefix}_qty_{kategori}_{it}{key_suffix}"
                 stored_k_qty = f"stored_{prefix}_qty_{kategori}_{it}"
                 init_qty = get_pkg_qty(prefix, kategori, it, 1.0)
-                val = st.number_input(f"Qty {it}:", min_value=0.5, value=init_qty, step=0.5, key=k_qty)
+                init_val_str = str(st.session_state.get(stored_k_qty, str(init_qty) if init_qty != 1.0 else "1"))
+                
+                # Sempilkan satuan barang jika tersedia di master_barang
+                it_sat = satuan_map.get(it, "")
+                sat_label = f" ({it_sat})" if it_sat else ""
+                
+                val = st.text_input(
+                    f"Qty {it}{sat_label}:", 
+                    value=init_val_str, 
+                    key=k_qty, 
+                    help=f"Ketik pecahan (misal: 1/8) atau desimal (0,05 atau 0.05). Satuan: {it_sat}" if it_sat else "Ketik pecahan (misal: 1/8) atau desimal (0,05 atau 0.05)."
+                )
                 st.session_state[stored_k_qty] = val
             with col_s:
                 it_sups = get_item_suppliers(it, master_df)
-                it_other_sups = [s for s in raw_suppliers if s not in it_sups]
-                it_sup_options = it_sups + (["-"] if "-" not in it_sups else []) + it_other_sups
-                k_sup = f"{prefix}_sup_{kategori}_{it}"
+                it_sup_options = it_sups if it_sups else ["-"]
+                k_sup = f"{prefix}_sup_{kategori}_{it}{key_suffix}"
                 stored_k_sup = f"stored_{prefix}_sup_{kategori}_{it}"
                 def_sup = it_sups[0] if it_sups else "-"
                 cur_sup = st.session_state.get(stored_k_sup, st.session_state.get(k_sup, def_sup))
@@ -192,24 +234,7 @@ def render_pkg_config_column(title, emoji, items_options, selected_items, state_
                 sel_sup = st.selectbox(f"Supplier {it}:", it_sup_options, index=sup_idx, key=k_sup)
                 st.session_state[stored_k_sup] = sel_sup
     else:
-        st.caption(f"ℹ️ *Default: 1x '{default_item}'*")
-        def_it = default_item
-        col_q, col_s = st.columns([1, 1.4])
-        with col_q:
-            st.number_input(f"Qty {def_it}:", min_value=0.5, value=1.0, step=0.5, disabled=True, key=f"dis_qty_{prefix}_{kategori}")
-        with col_s:
-            it_sups = get_item_suppliers(def_it, master_df)
-            it_other_sups = [s for s in raw_suppliers if s not in it_sups]
-            it_sup_options = it_sups + (["-"] if "-" not in it_sups else []) + it_other_sups
-            k_sup = f"{prefix}_sup_{kategori}_{def_it}"
-            stored_k_sup = f"stored_{prefix}_sup_{kategori}_{def_it}"
-            def_sup = it_sups[0] if it_sups else "-"
-            cur_sup = st.session_state.get(stored_k_sup, st.session_state.get(k_sup, def_sup))
-            if cur_sup not in it_sup_options:
-                cur_sup = def_sup if def_sup in it_sup_options else it_sup_options[0]
-            sup_idx = it_sup_options.index(cur_sup)
-            sel_sup = st.selectbox(f"Supplier {def_it}:", it_sup_options, index=sup_idx, key=k_sup)
-            st.session_state[stored_k_sup] = sel_sup
+        st.markdown("<div style='color: #dc2626; font-size: 0.85em; font-weight: 500; padding: 6px 0;'>⚠️ <i>Belum diatur. Pilih minimal 1 item di atas untuk mengaktifkan paket ini.</i></div>", unsafe_allow_html=True)
     return new_items
 
 @st.dialog("Pilih Banyak Barang Sekaligus 🛒")
@@ -350,6 +375,96 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
             border: 1px solid #fbc02d !important; 
             font-weight: 900 !important;
         }
+
+        /* Styling khusus dropdown Atur Isi Paket bernuansa Biru */
+        div[data-testid="stExpander"] {
+            border-radius: 10px !important;
+            border: 1.5px solid #93c5fd !important;
+            background-color: #f0f7ff !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08) !important;
+            overflow: hidden !important;
+            margin-top: 6px !important;
+            margin-bottom: 6px !important;
+            transition: all 0.2s ease !important;
+        }
+        div[data-testid="stExpander"]:hover {
+            border-color: #60a5fa !important;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15) !important;
+        }
+        div[data-testid="stExpander"] details {
+            border: none !important;
+            background: transparent !important;
+        }
+        div[data-testid="stExpander"] summary {
+            background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%) !important;
+            padding: 10px 14px !important;
+            border-radius: 8px !important;
+            transition: background 0.2s ease !important;
+        }
+        div[data-testid="stExpander"] summary:hover {
+            background: linear-gradient(90deg, #dbeafe 0%, #bfdbfe 100%) !important;
+        }
+        div[data-testid="stExpander"] summary p,
+        div[data-testid="stExpander"] summary span,
+        div[data-testid="stExpander"] summary strong {
+            color: #1e40af !important;
+            font-weight: 700 !important;
+            font-size: 0.92rem !important;
+        }
+        div[data-testid="stExpander"] summary svg {
+            color: #2563eb !important;
+            fill: #2563eb !important;
+        }
+        div[data-testid="stExpanderDetails"] {
+            background-color: #ffffff !important;
+            border-top: 1px dashed #93c5fd !important;
+            padding: 14px 16px !important;
+            border-radius: 0 0 8px 8px !important;
+        }
+
+        /* Styling tombol dropdown Isi Paket bernuansa Biru */
+        div[data-testid="stPopover"] {
+            width: 100% !important;
+        }
+        div[data-testid="stPopover"] > button {
+            background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%) !important;
+            border: 1.5px solid #93c5fd !important;
+            color: #1e40af !important;
+            font-weight: 700 !important;
+            border-radius: 8px !important;
+            height: 38px !important;
+            padding: 0 10px !important;
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08) !important;
+            transition: all 0.2s ease !important;
+        }
+        div[data-testid="stPopover"] > button:hover {
+            background: linear-gradient(90deg, #dbeafe 0%, #bfdbfe 100%) !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 3px 8px rgba(37, 99, 235, 0.2) !important;
+        }
+        div[data-testid="stPopover"] > button p,
+        div[data-testid="stPopover"] > button span {
+            color: #1e40af !important;
+            font-weight: 700 !important;
+            font-size: 0.92rem !important;
+        }
+        div[data-testid="stPopover"] > button svg {
+            color: #2563eb !important;
+            fill: #2563eb !important;
+        }
+        div[data-testid="stPopoverBody"] {
+            min-width: 420px !important;
+            max-width: 520px !important;
+            background-color: #ffffff !important;
+            border: 1.5px solid #93c5fd !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.18) !important;
+            padding: 16px !important;
+        }
         </style>
     """, unsafe_allow_html=True)
     
@@ -461,46 +576,7 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
             buah_options = get_prioritized_options(['pisang', 'jeruk', 'apel', 'semangka', 'melon', 'naga', 'buah'], item_options)
             roti_options = get_prioritized_options(['roti', 'bread'], item_options)
             
-            bar_col1, bar_col2 = st.columns([3.2, 1.3])
-            with bar_col1:
-                st.markdown(f"""
-                <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 12px; font-size: 0.88em; line-height: 1.4;">
-                    <b>🍱 Paket Aktif Manajemen:</b> &nbsp;
-                    <span style="color: #0f766e;">🥐 <b>Snack:</b> {snack_summary}</span> &nbsp;|&nbsp; 
-                    <span style="color: #b45309;">🍎 <b>Buah:</b> {buah_summary}</span> &nbsp;|&nbsp; 
-                    <span style="color: #4338ca;">🍞 <b>Roti:</b> {roti_summary}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            with bar_col2:
-                st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
-                show_pkg_panel = st.toggle("⚙️ **Atur Isi Paket**", key=pkg_toggle_key, help="Buka/tutup form untuk mengatur komposisi barang fisik & supplier paket shift ini")
-                
-            def close_pkg_panel_mgmt():
-                st.session_state[pkg_toggle_key] = False
-                
-            if show_pkg_panel:
-                with st.container(border=True):
-                    st.markdown(f"##### 🍱 Atur Komposisi Barang Fisik & Supplier ({tab_name})")
-                    st.caption("Pilih barang fisik, lalu atur **Qty** dan **Supplier** masing-masing secara berdampingan di bawah ini:")
-                    c_snk, c_buh, c_rot = st.columns(3)
-                    with c_snk:
-                        render_pkg_config_column("Paket Snack", "🥐", snack_options, selected_snack_items, pkg_snack_key, "pkg_snack", default_snack_label, tab_name, master_df, raw_suppliers, "Pilih kue/snack...")
-                    with c_buh:
-                        render_pkg_config_column("Paket Buah", "🍎", buah_options, selected_buah_items, pkg_buah_key, "pkg_buah", default_buah_label, tab_name, master_df, raw_suppliers, "Pilih buah...")
-                    with c_rot:
-                        render_pkg_config_column("Pilihan Roti", "🍞", roti_options, selected_roti_items, pkg_roti_key, "pkg_roti", default_roti_label, tab_name, master_df, raw_suppliers, "Pilih jenis roti...")
-                        
-                    selected_snack_items = st.session_state.get(pkg_snack_key, [])
-                    selected_buah_items = st.session_state.get(pkg_buah_key, [])
-                    selected_roti_items = st.session_state.get(pkg_roti_key, [])
-                    snack_summary = format_pkg_summary(selected_snack_items, "pkg_snack", default_snack_label, tab_name)
-                    buah_summary = format_pkg_summary(selected_buah_items, "pkg_buah", default_buah_label, tab_name)
-                    roti_summary = format_pkg_summary(selected_roti_items, "pkg_roti", default_roti_label, tab_name)
-                    
-                    st.divider()
-                    st.button("✅ Selesai Mengatur (Tutup Panel)", on_click=close_pkg_panel_mgmt, key=f"btn_close_pkg_{tab_name}", use_container_width=True)
-                    
-            st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+
         else:
             selected_snack_items = []
             selected_buah_items = []
@@ -515,13 +591,14 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
         # 2. DYNAMIC ITEM ROWS (Layout tanpa HPP Master dan Harga Real)
         h1, h_sup, h2, h_sat, h5, h6 = st.columns([2.5, 1.5, 1.1, 1.1, 1.8, 0.4])
         h1.caption("Pilih Barang")
-        h_sup.caption("Pilih Supplier")
+        h_sup.caption("Supplier / Isi Paket")
         h2.caption("Qty")
         h_sat.caption("Satuan")
         h5.caption("Keterangan Tambahan")
         h6.caption("")
         
         row_data = []
+        rendered_pkg_expanders = set()
         for i, row_id in enumerate(st.session_state[state_items_key]):
             default_idx = None
             if state_defaults_key in st.session_state and i < len(st.session_state[state_defaults_key]):
@@ -565,59 +642,40 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
                 elif "roti" in sel_clean or sel_clean == "roti":
                     is_roti_row = True
                     
-            if is_snack_row:
-                if selected_snack_items:
-                    c1.caption(f"🍱 **Paket Snack:** {snack_summary}")
-                else:
-                    c1.caption(f"ℹ️ *Default: 1x '{default_snack_label}'*")
-            elif is_buah_row:
-                if selected_buah_items:
-                    c1.caption(f"🍎 **Paket Buah:** {buah_summary}")
-                else:
-                    c1.caption(f"ℹ️ *Default: 1x '{default_buah_label}'*")
-            elif is_roti_row:
-                if selected_roti_items:
-                    c1.caption(f"🍞 **Paket Roti:** {roti_summary}")
-                else:
-                    c1.caption(f"ℹ️ *Default: 1x '{default_roti_label}'*")
-                    
             item_data = master_df[master_df['nama_barang'] == selected_item].iloc[0]
             stok_fisik = max(0.0, float(item_data.get('stok_sekarang', 0)))
             harga_master = float(item_data.get('harga_master', 0))
             satuan = item_data.get('satuan', '')
             is_unlimited = str(item_data.get('status', 'True')).upper() not in ['TRUE', '1', 'YES', 'T'] or float(item_data.get('stok_minimal', 0)) == 0
             
-            default_qty = 1.0 if (is_snack_row or is_buah_row or is_roti_row) else 0.0
+            default_qty = 0.0
             max_qty = 99999.0 if (is_unlimited or (is_snack_row and selected_snack_items) or (is_buah_row and selected_buah_items) or (is_roti_row and selected_roti_items)) else max(1.0, float(stok_fisik))
             
-            if is_snack_row and selected_snack_items:
+            if is_snack_row:
                 with c_sup:
-                    st.text_input("Supplier", value="[Sesuai Paket]", disabled=True, key=f"sup_pkg_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                    with st.popover("Isi Paket", use_container_width=True, key=f"pop_pkg_snack_{tab_name}_{rc}_{row_id}"):
+                        render_pkg_config_column("Paket Snack", "🥐", snack_options, selected_snack_items, pkg_snack_key, "pkg_snack", default_snack_label, tab_name, master_df, raw_suppliers, "Pilih kue/snack...", key_suffix=f"_row_{row_id}")
+                        selected_snack_items = st.session_state.get(pkg_snack_key, [])
+                        snack_summary = format_pkg_summary(selected_snack_items, "pkg_snack", default_snack_label, tab_name)
                 final_supplier = "[Sesuai Paket]"
-            elif is_buah_row and selected_buah_items:
+            elif is_buah_row:
                 with c_sup:
-                    st.text_input("Supplier", value="[Sesuai Paket]", disabled=True, key=f"sup_pkg_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                    with st.popover("Isi Paket", use_container_width=True, key=f"pop_pkg_buah_{tab_name}_{rc}_{row_id}"):
+                        render_pkg_config_column("Paket Buah", "🍎", buah_options, selected_buah_items, pkg_buah_key, "pkg_buah", default_buah_label, tab_name, master_df, raw_suppliers, "Pilih buah...", key_suffix=f"_row_{row_id}")
+                        selected_buah_items = st.session_state.get(pkg_buah_key, [])
+                        buah_summary = format_pkg_summary(selected_buah_items, "pkg_buah", default_buah_label, tab_name)
                 final_supplier = "[Sesuai Paket]"
-            elif is_roti_row and selected_roti_items:
+            elif is_roti_row:
                 with c_sup:
-                    st.text_input("Supplier", value="[Sesuai Paket]", disabled=True, key=f"sup_pkg_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                    with st.popover("Isi Paket", use_container_width=True, key=f"pop_pkg_roti_{tab_name}_{rc}_{row_id}"):
+                        render_pkg_config_column("Pilihan Roti", "🍞", roti_options, selected_roti_items, pkg_roti_key, "pkg_roti", default_roti_label, tab_name, master_df, raw_suppliers, "Pilih jenis roti...", key_suffix=f"_row_{row_id}")
+                        selected_roti_items = st.session_state.get(pkg_roti_key, [])
+                        roti_summary = format_pkg_summary(selected_roti_items, "pkg_roti", default_roti_label, tab_name)
                 final_supplier = "[Sesuai Paket]"
             else:
                 item_sups = get_item_suppliers(selected_item, master_df)
-                other_sups = [s for s in raw_suppliers if s not in item_sups]
-                row_supplier_options = item_sups + (["-"] if "-" not in item_sups else []) + other_sups
-                
-                if is_snack_row:
-                    def_s = st.session_state.get(f"pkg_snack_sup_{tab_name}_{default_snack_label}", "-")
-                    default_supp = def_s if def_s in row_supplier_options else (item_sups[0] if item_sups else "-")
-                elif is_buah_row:
-                    def_s = st.session_state.get(f"pkg_buah_sup_{tab_name}_{default_buah_label}", "-")
-                    default_supp = def_s if def_s in row_supplier_options else (item_sups[0] if item_sups else "-")
-                elif is_roti_row:
-                    def_s = st.session_state.get(f"pkg_roti_sup_{tab_name}_{default_roti_label}", "-")
-                    default_supp = def_s if def_s in row_supplier_options else (item_sups[0] if item_sups else "-")
-                else:
-                    default_supp = item_sups[0] if item_sups else "-"
+                row_supplier_options = item_sups if item_sups else ["-"]
+                default_supp = item_sups[0] if item_sups else "-"
                     
                 sup_key = f"sup_{tab_name}_{rc}_{row_id}_{selected_item}"
                 chosen_supp = st.session_state.get(sup_key, default_supp)
@@ -634,19 +692,44 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
                         label_visibility="collapsed"
                     )
                 final_supplier = sel_supp
-                
+
+            pkg_unconfigured = False
+            if is_snack_row and not selected_snack_items:
+                pkg_unconfigured = True
+            elif is_buah_row and not selected_buah_items:
+                pkg_unconfigured = True
+            elif is_roti_row and not selected_roti_items:
+                pkg_unconfigured = True
+
             with c2:
-                qty = st.number_input("Qty", min_value=0.0, max_value=max_qty, value=default_qty, step=1.0, format="%.2f", key=f"qty_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                if pkg_unconfigured:
+                    qty = st.number_input("Qty", min_value=0.0, max_value=0.0, value=0.0, disabled=True, key=f"qty_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                    st.markdown("<div style='color: #dc2626; font-size: 11px; font-weight: 600; line-height: 1.1; margin-top: -6px;'>⚠️ Atur paket dulu</div>", unsafe_allow_html=True)
+                else:
+                    qty = st.number_input("Qty", min_value=0.0, max_value=max_qty, value=default_qty, step=0.05, format="%.2f", key=f"qty_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
                 
             with c_sat:
-                satuan_val = "Paket" if (is_snack_row or is_buah_row or is_roti_row) else satuan
-                st.text_input("Satuan", value=satuan_val, disabled=True, key=f"sat_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                if is_snack_row or is_buah_row or is_roti_row:
+                    st.markdown("""
+                    <div style="background-color: #fee2e2; border: 1px solid #f87171; color: #991b1b; padding: 7px 4px; border-radius: 8px; text-align: center; font-size: 13px; font-weight: 700; height: 38px; display: flex; align-items: center; justify-content: center;">
+                        Paket
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.text_input("Satuan", value=satuan, disabled=True, key=f"sat_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
                 
             with c5:
                 keterangan = st.text_input("Ket", placeholder="Catatan (Opsional)...", key=f"ket_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
                 
             with c6:
                 st.button("🗑️", key=f"del_{tab_name}_{rc}_{row_id}", on_click=remove_row, args=(row_id,))
+
+            if is_snack_row:
+                st.caption(f"🍱 **Paket Snack:** {snack_summary}" if selected_snack_items else f"ℹ️ *Default: 1x '{default_snack_label}'*")
+            elif is_buah_row:
+                st.caption(f"🍎 **Paket Buah:** {buah_summary}" if selected_buah_items else f"ℹ️ *Default: 1x '{default_buah_label}'*")
+            elif is_roti_row:
+                st.caption(f"🍞 **Paket Roti:** {roti_summary}" if selected_roti_items else f"ℹ️ *Default: 1x '{default_roti_label}'*")
                 
             if (is_snack_row and selected_snack_items) or (is_buah_row and selected_buah_items) or (is_roti_row and selected_roti_items):
                 error_stok = False
@@ -766,6 +849,9 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
                         "stok_fisik": stk_item,
                         "is_unlimited": is_unl
                     })
+            elif r.get('is_snack_row') or r.get('is_buah_row') or r.get('is_roti_row'):
+                # Paket belum diatur, lewati unrolling default agar tidak masuk sebagai default label
+                continue
             else:
                 row_sup = resolve_pkg_supplier(r['nama_barang'], r['supplier'], master_dict_by_name)
                 unrolled_rows.append({
@@ -786,8 +872,13 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
             
         insufficient_stock_errors = []
         for (it_name, sup_name), needed_qty in stock_needed.items():
-            m_info = master_dict_by_name_sup.get((it_name, sup_name), master_dict_by_name.get(it_name, {}))
-            stk_fisik = float(m_info.get('stok_sekarang', 0))
+            if (it_name, sup_name) in master_dict_by_name_sup:
+                m_info = master_dict_by_name_sup[(it_name, sup_name)]
+                stk_fisik = float(m_info.get('stok_sekarang', 0))
+            else:
+                m_info = master_dict_by_name.get(it_name, {})
+                matching_m = master_df[master_df['nama_barang'] == it_name]
+                stk_fisik = float(pd.to_numeric(matching_m['stok_sekarang'], errors='coerce').sum()) if not matching_m.empty else float(m_info.get('stok_sekarang', 0))
             is_unl = str(m_info.get('status', 'True')).upper() not in ['TRUE', '1', 'YES', 'T'] or float(m_info.get('stok_minimal', 0)) == 0
             if not is_unl and stk_fisik < needed_qty:
                 supp_str = f" ({sup_name})" if sup_name and sup_name != "-" else ""
@@ -820,6 +911,19 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
             if len(unrolled_rows) == 0:
                 st.error("Pilih minimal 1 barang!")
                 return
+                
+            # Validasi paket belum diatur
+            for r in row_data:
+                if r.get('is_snack_row') and not selected_snack_items and r.get('qty', 0) > 0:
+                    st.error("❌ Gagal Simpan! Isi paket Snack belum diatur. Silakan klik tombol 'Isi Paket' pada kolom Supplier terlebih dahulu.")
+                    return
+                if r.get('is_buah_row') and not selected_buah_items and r.get('qty', 0) > 0:
+                    st.error("❌ Gagal Simpan! Isi paket Buah belum diatur. Silakan klik tombol 'Isi Paket' pada kolom Supplier terlebih dahulu.")
+                    return
+                if r.get('is_roti_row') and not selected_roti_items and r.get('qty', 0) > 0:
+                    st.error("❌ Gagal Simpan! Isi paket Roti belum diatur. Silakan klik tombol 'Isi Paket' pada kolom Supplier terlebih dahulu.")
+                    return
+                    
             if has_error:
                 st.error("Ada barang yang stoknya tidak mencukupi. Silakan perbaiki terlebih dahulu!")
                 return

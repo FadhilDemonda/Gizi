@@ -10,7 +10,13 @@ def safe_float(val):
     try:
         if pd.isna(val) or val == "":
             return 0.0
-        return float(val)
+        if isinstance(val, (int, float)):
+            return float(val)
+        val_str = str(val).strip().replace(',', '.')
+        if '/' in val_str:
+            num, den = val_str.split('/')
+            return float(num) / float(den)
+        return float(val_str)
     except:
         return 0.0
 
@@ -147,6 +153,18 @@ def show_master_barang():
                 "Harga Real Terakhir (Rp)",
                 help="Harga beli riil dari stok masuk terakhir (digunakan untuk pengeluaran pasien)",
                 format="Rp %d"
+            ),
+            "stok_sekarang": st.column_config.NumberColumn(
+                "Stok Sekarang",
+                min_value=0.0,
+                step=0.05,
+                format="%.2f"
+            ),
+            "stok_minimum": st.column_config.NumberColumn(
+                "Stok Minimum",
+                min_value=0.0,
+                step=0.05,
+                format="%.2f"
             ),
             "status": st.column_config.CheckboxColumn(
                 "Status (Pantau Stok)",
@@ -320,6 +338,9 @@ def show_master_barang():
     if not unique_satuan:
         unique_satuan = ["Kg", "Liter", "Pack", "Sak"]
         
+    supp_list = extract_unique_suppliers(master_df)
+    unique_suppliers = ["-"] + [s for s in supp_list if s and s != "-"] + ["Lainnya (Ketik)"]
+        
     st_key = "dyn_items_master"
     if st_key not in st.session_state:
         st.session_state[st_key] = [0]
@@ -353,7 +374,14 @@ def show_master_barang():
             with c2:
                 nama_brg = st.text_input("Nama", key=f"nama_{row_id}", label_visibility="collapsed")
             with csup:
-                sup_brg = st.text_input("Supplier", key=f"sup_{row_id}", placeholder="Supplier...", label_visibility="collapsed")
+                def_sup_idx = 0
+                if selected_sup != "Semua Supplier" and selected_sup in unique_suppliers:
+                    def_sup_idx = unique_suppliers.index(selected_sup)
+                sel_sup = st.selectbox("Supplier", unique_suppliers, index=def_sup_idx, key=f"sup_opt_{row_id}", label_visibility="collapsed")
+                if sel_sup == "Lainnya (Ketik)":
+                    sup_brg = st.text_input("Ketik Supplier", key=f"sup_custom_{row_id}", placeholder="Ketik nama supplier...", label_visibility="collapsed")
+                else:
+                    sup_brg = sel_sup
             with c3:
                 sat_brg = st.selectbox("Satuan", unique_satuan, key=f"sat_{row_id}", label_visibility="collapsed")
             with ccat:
@@ -361,9 +389,9 @@ def show_master_barang():
             with c4:
                 harga_brg = st.number_input("Harga", min_value=0.0, step=100.0, key=f"harga_{row_id}", label_visibility="collapsed")
             with c5:
-                stok_min = st.number_input("Min", min_value=0.0, value=10.0, step=1.0, format="%.2f", key=f"min_{row_id}", label_visibility="collapsed")
+                stok_min = st.number_input("Min", min_value=0.0, value=10.0, step=0.05, format="%.2f", key=f"min_{row_id}", label_visibility="collapsed")
             with c6:
-                stok_skrg = st.number_input("Awal", min_value=0.0, value=0.0, step=1.0, format="%.2f", key=f"awal_{row_id}", label_visibility="collapsed")
+                stok_skrg = st.number_input("Awal", min_value=0.0, value=0.0, step=0.05, format="%.2f", key=f"awal_{row_id}", label_visibility="collapsed")
             with c7:
                 st.button("🗑️", key=f"del_master_{row_id}", on_click=remove_master_row, args=(row_id,))
                 

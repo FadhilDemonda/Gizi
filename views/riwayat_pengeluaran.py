@@ -489,7 +489,13 @@ def render_riwayat_pengeluaran_excel(master_df):
         )
         mask = mask & q_mask
 
-    filtered_data = df_filtered[mask].copy().sort_values(by='tanggal', ascending=False)
+    if sel_sumber == "Semua Pengeluaran":
+        cat_order_map = {'PASIEN': 1, 'DOKTER': 2, 'MANAJEMEN': 3}
+        filtered_data = df_filtered[mask].copy()
+        filtered_data['_sort_rank'] = filtered_data['_cat_type'].map(cat_order_map).fillna(99)
+        filtered_data = filtered_data.sort_values(by=['_sort_rank', 'tanggal'], ascending=[True, False]).drop(columns=['_sort_rank'])
+    else:
+        filtered_data = df_filtered[mask].copy().sort_values(by='tanggal', ascending=False)
     tgl_info = k_start.strftime('%d %b %Y') if k_start == k_end else f"{k_start.strftime('%d %b %Y')} s/d {k_end.strftime('%d %b %Y')}"
 
     if filtered_data.empty:
@@ -502,8 +508,98 @@ def render_riwayat_pengeluaran_excel(master_df):
         with col_t:
             st.markdown(f"#### 📊 Tabel Excel Riwayat Pengeluaran ({len(filtered_data)} Baris)")
             st.caption("Klik sel **Qty Keluar**, **Harga Real**, **Jml Pasien**, atau **Keterangan** untuk mengedit langsung. Centang kolom **Hapus** untuk menghapus transaksi:")
+        # Penyesuaian kolom & konfigurasi berdasarkan Sumber Pengeluaran
+        if sel_sumber == "🛏️ Pasien":
+            cols_to_display = [
+                'tanggal', 'shift', 'kategori', 'nama_barang', 
+                'supplier', 'satuan', 'qty', 'harga_real', 'total_harga', 
+                'jumlah_pasien', 'keterangan', 'hapus'
+            ]
+            column_config = {
+                "tanggal": st.column_config.TextColumn("Tanggal", disabled=True, width="small"),
+                "shift": st.column_config.TextColumn("Shift", disabled=True, width="small"),
+                "kategori": st.column_config.TextColumn("Kelas Pasien", disabled=True, width="medium"),
+                "nama_barang": st.column_config.TextColumn("Nama Barang", disabled=True, width="medium"),
+                "supplier": st.column_config.TextColumn("Supplier", disabled=True, width="small"),
+                "satuan": st.column_config.TextColumn("Satuan", disabled=True, width="small"),
+                "qty": st.column_config.NumberColumn("Qty Keluar", min_value=0.0, step=0.05, format="%.2f", required=True),
+                "harga_real": st.column_config.NumberColumn("Harga Real (Rp)", min_value=0, step=100, format="Rp %d", required=True),
+                "total_harga": st.column_config.NumberColumn("Total Biaya (Rp)", format="Rp %d", disabled=True),
+                "jumlah_pasien": st.column_config.NumberColumn("Jml Pasien", min_value=1, step=1, format="%d", required=True),
+                "keterangan": st.column_config.TextColumn("Keterangan / Catatan"),
+                "hapus": st.column_config.CheckboxColumn("Hapus 🗑️", help="Centang untuk menandai transaksi ini dihapus", default=False)
+            }
+        elif sel_sumber == "🩺 Dokter":
+            cols_to_display = [
+                'tanggal', 'shift', 'kategori', 'tujuan', 'nama_barang', 
+                'supplier', 'satuan', 'qty', 'harga_real', 'total_harga', 
+                'keterangan', 'hapus'
+            ]
+            column_config = {
+                "tanggal": st.column_config.TextColumn("Tanggal", disabled=True, width="small"),
+                "shift": st.column_config.TextColumn("Shift", disabled=True, width="small"),
+                "kategori": st.column_config.TextColumn("Kategori", disabled=True, width="medium"),
+                "tujuan": st.column_config.TextColumn("👨‍⚕️ Nama Dokter", disabled=True, width="medium"),
+                "nama_barang": st.column_config.TextColumn("Nama Barang", disabled=True, width="medium"),
+                "supplier": st.column_config.TextColumn("Supplier", disabled=True, width="small"),
+                "satuan": st.column_config.TextColumn("Satuan", disabled=True, width="small"),
+                "qty": st.column_config.NumberColumn("Qty Keluar", min_value=0.0, step=0.05, format="%.2f", required=True),
+                "harga_real": st.column_config.NumberColumn("Harga Real (Rp)", min_value=0, step=100, format="Rp %d", required=True),
+                "total_harga": st.column_config.NumberColumn("Total Biaya (Rp)", format="Rp %d", disabled=True),
+                "keterangan": st.column_config.TextColumn("Keterangan / Catatan"),
+                "hapus": st.column_config.CheckboxColumn("Hapus 🗑️", help="Centang untuk menandai transaksi ini dihapus", default=False)
+            }
+        elif sel_sumber == "🏢 Manajemen":
+            cols_to_display = [
+                'tanggal', 'shift', 'kategori', 'tujuan', 'nama_barang', 
+                'supplier', 'satuan', 'qty', 'harga_real', 'total_harga', 
+                'keterangan', 'hapus'
+            ]
+            column_config = {
+                "tanggal": st.column_config.TextColumn("Tanggal", disabled=True, width="small"),
+                "shift": st.column_config.TextColumn("Shift", disabled=True, width="small"),
+                "kategori": st.column_config.TextColumn("Kategori", disabled=True, width="medium"),
+                "tujuan": st.column_config.TextColumn("🏢 Keperluan / Divisi", disabled=True, width="medium"),
+                "nama_barang": st.column_config.TextColumn("Nama Barang", disabled=True, width="medium"),
+                "supplier": st.column_config.TextColumn("Supplier", disabled=True, width="small"),
+                "satuan": st.column_config.TextColumn("Satuan", disabled=True, width="small"),
+                "qty": st.column_config.NumberColumn("Qty Keluar", min_value=0.0, step=0.05, format="%.2f", required=True),
+                "harga_real": st.column_config.NumberColumn("Harga Real (Rp)", min_value=0, step=100, format="Rp %d", required=True),
+                "total_harga": st.column_config.NumberColumn("Total Biaya (Rp)", format="Rp %d", disabled=True),
+                "keterangan": st.column_config.TextColumn("Keterangan / Catatan"),
+                "hapus": st.column_config.CheckboxColumn("Hapus 🗑️", help="Centang untuk menandai transaksi ini dihapus", default=False)
+            }
+        else:
+            cols_to_display = [
+                'sumber', 'tanggal', 'shift', 'kategori', 'tujuan', 'nama_barang', 
+                'supplier', 'satuan', 'qty', 'harga_real', 'total_harga', 
+                'jumlah_pasien', 'keterangan', 'hapus'
+            ]
+            column_config = {
+                "sumber": st.column_config.TextColumn("Sumber", disabled=True, width="small"),
+                "tanggal": st.column_config.TextColumn("Tanggal", disabled=True, width="small"),
+                "shift": st.column_config.TextColumn("Shift", disabled=True, width="small"),
+                "kategori": st.column_config.TextColumn("Kategori / Kelas", disabled=True, width="medium"),
+                "tujuan": st.column_config.TextColumn("Dokter / Tujuan", disabled=True, width="medium"),
+                "nama_barang": st.column_config.TextColumn("Nama Barang", disabled=True, width="medium"),
+                "supplier": st.column_config.TextColumn("Supplier", disabled=True, width="small"),
+                "satuan": st.column_config.TextColumn("Satuan", disabled=True, width="small"),
+                "qty": st.column_config.NumberColumn("Qty Keluar", min_value=0.0, step=0.05, format="%.2f", required=True),
+                "harga_real": st.column_config.NumberColumn("Harga Real (Rp)", min_value=0, step=100, format="Rp %d", required=True),
+                "total_harga": st.column_config.NumberColumn("Total Biaya (Rp)", format="Rp %d", disabled=True),
+                "jumlah_pasien": st.column_config.NumberColumn("Jml Pasien", min_value=0, step=1, format="%d"),
+                "keterangan": st.column_config.TextColumn("Keterangan / Catatan"),
+                "hapus": st.column_config.CheckboxColumn("Hapus 🗑️", help="Centang untuk menandai transaksi ini dihapus", default=False)
+            }
+
+        # Siapkan dataframe untuk data editor
+        df_editor_input = filtered_data.copy()
+        df_editor_input = df_editor_input.set_index('_id')
+        df_editor_input = df_editor_input[cols_to_display]
+
         with col_exp:
-            csv_export = filtered_data.drop(columns=['_id', '_cat_type', '_orig_idx', 'parsed_date', 'hapus'], errors='ignore')
+            csv_cols = [c for c in cols_to_display if c != 'hapus']
+            csv_export = filtered_data[csv_cols]
             st.download_button(
                 label=f"📥 Export Excel/CSV ({len(filtered_data)})",
                 data=csv_export.to_csv(index=False).encode('utf-8'),
@@ -511,17 +607,6 @@ def render_riwayat_pengeluaran_excel(master_df):
                 mime="text/csv",
                 use_container_width=True
             )
-
-        # Siapkan dataframe untuk data editor
-        df_editor_input = filtered_data.copy()
-        df_editor_input = df_editor_input.set_index('_id')
-        
-        cols_to_display = [
-            'sumber', 'tanggal', 'shift', 'kategori', 'tujuan', 'nama_barang', 
-            'supplier', 'satuan', 'qty', 'harga_real', 'total_harga', 
-            'jumlah_pasien', 'keterangan', 'hapus'
-        ]
-        df_editor_input = df_editor_input[cols_to_display]
 
         kat_tag = "_".join(sorted(sel_kats)) if sel_kats else "all"
         editor_key = f"editor_pengeluaran_{k_start}_{k_end}_{sel_sumber}_{kat_tag}"
@@ -546,22 +631,7 @@ def render_riwayat_pengeluaran_excel(master_df):
             hide_index=True,
             num_rows="dynamic",
             key=editor_key,
-            column_config={
-                "sumber": st.column_config.TextColumn("Sumber", disabled=True, width="small"),
-                "tanggal": st.column_config.TextColumn("Tanggal", disabled=True, width="small"),
-                "shift": st.column_config.TextColumn("Shift", disabled=True, width="small"),
-                "kategori": st.column_config.TextColumn("Kategori / Kelas", disabled=True, width="medium"),
-                "tujuan": st.column_config.TextColumn("Dokter / Tujuan", disabled=True, width="medium"),
-                "nama_barang": st.column_config.TextColumn("Nama Barang", disabled=True, width="medium"),
-                "supplier": st.column_config.TextColumn("Supplier", disabled=True, width="small"),
-                "satuan": st.column_config.TextColumn("Satuan", disabled=True, width="small"),
-                "qty": st.column_config.NumberColumn("Qty Keluar", min_value=0.0, step=0.1, format="%.2f", required=True),
-                "harga_real": st.column_config.NumberColumn("Harga Real (Rp)", min_value=0, step=100, format="Rp %d", required=True),
-                "total_harga": st.column_config.NumberColumn("Total Biaya (Rp)", format="Rp %d", disabled=True),
-                "jumlah_pasien": st.column_config.NumberColumn("Jml Pasien", min_value=0, step=1, format="%d"),
-                "keterangan": st.column_config.TextColumn("Keterangan / Catatan"),
-                "hapus": st.column_config.CheckboxColumn("Hapus 🗑️", help="Centang untuk menandai transaksi ini dihapus", default=False)
-            }
+            column_config=column_config
         )
 
         # Pastikan nilai total_harga selalu tersinkronisasi dengan qty * harga_real
@@ -584,7 +654,7 @@ def render_riwayat_pengeluaran_excel(master_df):
             old_q = float(orig_row['qty'])
             old_p = float(orig_row['harga_real'])
             old_tot = old_q * old_p
-            old_pas = float(orig_row['jumlah_pasien'])
+            old_pas = float(orig_row['jumlah_pasien']) if 'jumlah_pasien' in orig_row else float(filtered_data.loc[filtered_data['_id'] == _id, 'jumlah_pasien'].iloc[0])
             old_ket = str(orig_row['keterangan']).strip()
 
             if _id in deleted_ids_keyboard:
@@ -633,7 +703,7 @@ def render_riwayat_pengeluaran_excel(master_df):
             cur_q = float(cur_row['qty'])
             cur_p = float(cur_row['harga_real'])
             cur_tot = cur_q * cur_p
-            cur_pas = float(cur_row['jumlah_pasien'])
+            cur_pas = float(cur_row['jumlah_pasien']) if 'jumlah_pasien' in cur_row else old_pas
             cur_ket = str(cur_row.get('keterangan', '')).strip()
 
             grand_new_total += cur_tot
@@ -783,7 +853,7 @@ def render_riwayat_harga_excel(master_df):
                 "shift": st.column_config.TextColumn("Shift", disabled=True, width="small"),
                 "supplier": st.column_config.TextColumn("Supplier", disabled=True, width="medium"),
                 "nama_barang": st.column_config.TextColumn("Nama Barang", disabled=True, width="medium"),
-                "qty": st.column_config.NumberColumn("Qty Masuk", min_value=0.0, step=0.1, format="%.2f", required=True),
+                "qty": st.column_config.NumberColumn("Qty Masuk", min_value=0.0, step=0.05, format="%.2f", required=True),
                 "harga_master": st.column_config.NumberColumn("HPP Master (Rp)", format="Rp %d", disabled=True),
                 "harga_real": st.column_config.NumberColumn("Harga Real Beli (Rp)", min_value=0, step=100, format="Rp %d", required=True),
                 "total_harga": st.column_config.NumberColumn("Total Beli (Rp)", format="Rp %d", disabled=True),

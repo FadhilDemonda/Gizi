@@ -399,7 +399,7 @@ def render_koreksi_pembelian(master_df):
                 st.markdown(f"<div style='font-size: 11px; color: #0284c7; margin-top: -10px; margin-bottom: 4px;'>🏢 {supp_val} <span style='color:gray;'>({tgl_val})</span></div>", unsafe_allow_html=True)
                 
             with c2:
-                edit_qty = st.number_input("Qty", min_value=0.01, value=old_qty, step=1.0, format="%.2f", key=f"rw_qty_{orig_idx}", label_visibility="collapsed")
+                edit_qty = st.number_input("Qty", min_value=0.0, value=old_qty, step=0.05, format="%.2f", key=f"rw_qty_{orig_idx}", label_visibility="collapsed")
                 st.markdown(f"<div style='font-size: 11px; color: gray; margin-top: -10px; margin-bottom: 4px;'>{satuan}</div>", unsafe_allow_html=True)
                 
             with c3:
@@ -572,8 +572,7 @@ def render_input_stok_masuk(master_df):
         all_items = [x for x in master_df['nama_barang'].dropna().unique().tolist() if str(x).strip()]
         if supplier and supplier not in ["Lainnya", "Kasir"] and 'supplier' in master_df.columns:
             supp_items = [x for x in master_df[master_df['supplier'].apply(lambda x: match_supplier(x, supplier))]['nama_barang'].dropna().unique().tolist() if str(x).strip()]
-            other_items = [it for it in all_items if it not in supp_items]
-            item_options = supp_items + other_items
+            item_options = supp_items if supp_items else all_items
         else:
             item_options = all_items
         
@@ -654,7 +653,7 @@ def render_input_stok_masuk(master_df):
                 default_beli = 0
             
             with c2:
-                qty = st.number_input("Qty", min_value=0.0, value=1.0, step=1.0, format="%.2f", key=f"qty_masuk_{row_id}", label_visibility="collapsed")
+                qty = st.number_input("Qty", min_value=0.0, value=1.0, step=0.05, format="%.2f", key=f"qty_masuk_{row_id}", label_visibility="collapsed")
                 st.markdown(f"<div style='font-size: 11px; color: gray; text-align: left; margin-top: -10px; margin-bottom: 5px; padding-left: 2px;'>{satuan}</div>", unsafe_allow_html=True)
             
             with c3:

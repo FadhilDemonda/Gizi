@@ -138,10 +138,9 @@ def show_pengeluaran_pasien():
             if matching_items.empty:
                 continue
 
-            # Prioritaskan supplier yang memasok barang ini di opsi teratas
+            # Batasi hanya supplier yang memasok barang ini di master_df
             item_sups = get_item_suppliers(selected_item, master_df)
-            other_sups = [s for s in raw_suppliers if s not in item_sups]
-            row_supplier_options = item_sups + (["-"] if "-" not in item_sups else []) + other_sups
+            row_supplier_options = item_sups if item_sups else ["-"]
 
             # Tentukan default supplier
             default_supp = item_sups[0] if item_sups else "-"
@@ -186,7 +185,7 @@ def show_pengeluaran_pasien():
                 st.markdown(f"<div style='font-size: 11px; margin-top: -10px; margin-bottom: 5px; padding-left: 2px; color: #047857;'>💰 Real Master{supp_tag}: <b>Rp {harga_real:,.0f}</b> / {satuan} <span style='color:gray;'>(Stok: {stok_fisik:g})</span></div>", unsafe_allow_html=True)
 
             with c2:
-                qty = st.number_input("Qty", min_value=0.0, max_value=99999.0, value=1.0, step=1.0, format="%.2f", key=f"qty_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
+                qty = st.number_input("Qty", min_value=0.0, max_value=99999.0, value=1.0, step=0.05, format="%.2f", key=f"qty_{tab_name}_{rc}_{row_id}", label_visibility="collapsed")
             
             with c_sat:
                 st.text_input("Satuan", value=satuan, disabled=True, key=f"sat_{tab_name}_{rc}_{row_id}_{selected_item}", label_visibility="collapsed")
@@ -677,7 +676,7 @@ def show_riwayat_pengeluaran_pasien():
                 st.markdown(f"<div style='font-size: 11px; color: #0284c7; margin-top: -10px; margin-bottom: 4px;'>🛏️ <b>{kat_val}</b> | {shift_short} | 🏢 {supp_val} <span style='color:gray;'>({tgl_val})</span></div>", unsafe_allow_html=True)
                 
             with c2:
-                edit_qty = st.number_input("Qty", min_value=0.0, value=old_qty, step=1.0, format="%.2f", key=f"rwp_qty_{orig_idx}", label_visibility="collapsed")
+                edit_qty = st.number_input("Qty", min_value=0.0, value=old_qty, step=0.05, format="%.2f", key=f"rwp_qty_{orig_idx}", label_visibility="collapsed")
                 st.markdown(f"<div style='font-size: 11px; color: gray; margin-top: -10px; margin-bottom: 4px;'>{satuan} (Semula: {old_qty:g})</div>", unsafe_allow_html=True)
                 
             with c3:
