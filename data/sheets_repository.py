@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import gspread
 from gspread_dataframe import set_with_dataframe
@@ -21,11 +22,34 @@ SHEET_LOG = "log"
 MASTER_CSV = SHEET_MASTER
 TRANSAKSI_CSV = SHEET_LOG
 
+DEFAULT_SHEETS_URL = "https://docs.google.com/spreadsheets/d/1zwbCoGZr5G4f5xV7gvQrJBE4thRF1r13V1uV6z3NNJU/edit?usp=sharing"
+
+def get_sheets_url() -> str:
+    """Safely retrieve Google Sheets URL with fallback"""
+    try:
+        if hasattr(st, "secrets") and "google_sheets" in st.secrets and "url" in st.secrets["google_sheets"]:
+            return st.secrets["google_sheets"]["url"]
+    except Exception:
+        pass
+    return DEFAULT_SHEETS_URL
+
 @st.cache_resource
 def get_gspread_client():
-    """Get authenticated gspread client (cached for session)"""
-    account_info = dict(st.secrets["gcp_service_account"])
-    return gspread.service_account_from_dict(account_info)
+    """Get authenticated gspread client (cached for session) with robust fallback"""
+    try:
+        if hasattr(st, "secrets") and "gcp_service_account" in st.secrets:
+            account_info = dict(st.secrets["gcp_service_account"])
+            return gspread.service_account_from_dict(account_info)
+    except Exception as e:
+        logger.warning(f"Could not load credentials from st.secrets: {e}")
+        
+    # Fallback to repository JSON key file if secrets not provided in cloud
+    json_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cgizi-509609-9ff82417a962.json")
+    if os.path.exists(json_path):
+        logger.info(f"Authenticating gspread using local key file: {json_path}")
+        return gspread.service_account(filename=json_path)
+        
+    raise ValueError("GCP Service Account credentials not found in st.secrets or local JSON file.")
 
 @st.cache_data(show_spinner=False)
 def get_sheet_data(sheet_name: str) -> pd.DataFrame:
@@ -35,7 +59,7 @@ def get_sheet_data(sheet_name: str) -> pd.DataFrame:
     """
     try:
         gc = get_gspread_client()
-        sh = gc.open_by_url(st.secrets["google_sheets"]["url"])
+        sh = gc.open_by_url(get_sheets_url())
         ws = sh.worksheet(sheet_name)
         df = pd.DataFrame(ws.get_all_records(numericise_ignore=["all"]))
         
@@ -73,7 +97,7 @@ def save_data(df: pd.DataFrame, sheet_name: str) -> None:
     """
     try:
         gc = get_gspread_client()
-        sh = gc.open_by_url(st.secrets["google_sheets"]["url"])
+        sh = gc.open_by_url(get_sheets_url())
         ws = sh.worksheet(sheet_name)
         
         # Clear existing content
