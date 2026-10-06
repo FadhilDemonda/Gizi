@@ -302,16 +302,19 @@ def show_dashboard():
         except:
             return val
             
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3 = st.columns(3)
     m1.metric("Stok Fisik Gudang", f"{format_qty(total_stok_sekarang)} Qty")
     m2.metric("Volume Masuk", f"{format_qty(total_masuk)} Qty")
     m3.metric("Volume Keluar", f"{format_qty(total_keluar_qty)} Qty")
-    if efisiensi_belanja > 0:
-        m4.metric("Status Efisiensi", f"Hemat Rp {efisiensi_belanja:,.0f}")
-    elif efisiensi_belanja < 0:
-        m4.metric("Status Efisiensi", f"Rugi Rp {abs(efisiensi_belanja):,.0f}")
-    else:
-        m4.metric("Status Efisiensi", "Sesuai HPP (Rp 0)")
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        if efisiensi_belanja > 0:
+            st.metric("💡 Status Efisiensi Belanja", f"Hemat Rp {efisiensi_belanja:,.0f}")
+        elif efisiensi_belanja < 0:
+            st.metric("📉 Status Efisiensi Belanja", f"Rugi Rp {abs(efisiensi_belanja):,.0f}")
+        else:
+            st.metric("⚖️ Status Efisiensi Belanja", "Sesuai HPP (Rp 0)")
     
     st.markdown("---")
     st.markdown("<br>", unsafe_allow_html=True)
