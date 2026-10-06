@@ -11,9 +11,9 @@ from views.pengeluaran import (
     show_pengeluaran_pasien, 
     show_pengeluaran_dokter, 
     show_pengeluaran_manajemen,
-    show_pengeluaran_karyawan,
     show_riwayat_pengeluaran
 )
+from views.pengeluaran_karyawan import show_pengeluaran_karyawan
 from views.laporan_harian import show_laporan_harian
 from views.analisis_stok import show_analisis_stok
 
