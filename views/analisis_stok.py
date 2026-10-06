@@ -105,14 +105,12 @@ def show_analisis_stok():
             st.success("✅ **Semua Stok Aman!** Tidak ada barang yang tercatat.")
     else:
         # HEADER
-        html_output = """
-        <div style='display: flex; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px;'>
-            <div style='flex: 1.5; color: gray; font-size: 0.85rem; font-weight: 700;'>DETAIL BARANG & SKU</div>
-            <div style='flex: 1.5; color: gray; font-size: 0.85rem; font-weight: 700;'>LEVEL STOK SAAT INI</div>
-            <div style='flex: 1.2; color: gray; font-size: 0.85rem; font-weight: 700;'>STATUS & ESTIMASI</div>
-            <div style='flex: 1.3; color: gray; font-size: 0.85rem; font-weight: 700;'>SUPPLIER TERMURAH</div>
-        </div>
-        """
+        html_output = "<div style='display: flex; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px;'>"
+        html_output += "<div style='flex: 1.5; color: gray; font-size: 0.85rem; font-weight: 700;'>DETAIL BARANG & SKU</div>"
+        html_output += "<div style='flex: 1.5; color: gray; font-size: 0.85rem; font-weight: 700;'>LEVEL STOK SAAT INI</div>"
+        html_output += "<div style='flex: 1.2; color: gray; font-size: 0.85rem; font-weight: 700;'>STATUS & ESTIMASI</div>"
+        html_output += "<div style='flex: 1.3; color: gray; font-size: 0.85rem; font-weight: 700;'>SUPPLIER TERMURAH</div>"
+        html_output += "</div>"
         
         full_df['harga_master_numeric'] = pd.to_numeric(full_df['harga_master'], errors='coerce').fillna(float('inf'))
         full_df['stok_sekarang_numeric'] = pd.to_numeric(full_df['stok_sekarang'], errors='coerce').fillna(0)
@@ -151,13 +149,11 @@ def show_analisis_stok():
                 supplier=supplier, is_termurah=is_termurah, harga_master=harga_m if harga_m != float('inf') else 0.0
             )
             
-            html_output += f"""
-            <div style='display: flex; border-bottom: 1px solid #f0f0f0; padding: 10px 0;'>
-                <div style='flex: 1.5; padding-right: 15px;'>{c1_html}</div>
-                <div style='flex: 1.5; padding-right: 15px;'>{c2_html}</div>
-                <div style='flex: 1.2; padding-right: 15px;'>{c3_html}</div>
-                <div style='flex: 1.3;'>{c4_html}</div>
-            </div>
-            """
+            html_output += "<div style='display: flex; border-bottom: 1px solid #f0f0f0; padding: 10px 0;'>"
+            html_output += f"<div style='flex: 1.5; padding-right: 15px;'>{c1_html}</div>"
+            html_output += f"<div style='flex: 1.5; padding-right: 15px;'>{c2_html}</div>"
+            html_output += f"<div style='flex: 1.2; padding-right: 15px;'>{c3_html}</div>"
+            html_output += f"<div style='flex: 1.3;'>{c4_html}</div>"
+            html_output += "</div>"
             
         st.markdown(html_output, unsafe_allow_html=True)
