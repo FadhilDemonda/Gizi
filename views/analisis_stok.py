@@ -111,6 +111,7 @@ def show_analisis_stok():
         html_output += "<div style='flex: 1.2; color: gray; font-size: 0.85rem; font-weight: 700;'>STATUS & ESTIMASI</div>"
         html_output += "<div style='flex: 1.3; color: gray; font-size: 0.85rem; font-weight: 700;'>SUPPLIER TERMURAH</div>"
         html_output += "</div>"
+        st.markdown(html_output, unsafe_allow_html=True)
         
         full_df['harga_master_numeric'] = pd.to_numeric(full_df['harga_master'], errors='coerce').fillna(float('inf'))
         full_df['stok_sekarang_numeric'] = pd.to_numeric(full_df['stok_sekarang'], errors='coerce').fillna(0)
@@ -126,6 +127,10 @@ def show_analisis_stok():
         full_df['stok_sekarang'] = full_df['nama_barang'].map(total_stok)
         full_df['persentase'] = full_df['stok_sekarang'] / full_df['stok_minimum_safe']
         full_df = full_df.sort_values(by='persentase')
+        
+        chunk_size = 20
+        current_chunk = ""
+        count = 0
         
         for _, row in full_df.iterrows():
             stok = row['stok_sekarang']
@@ -149,11 +154,18 @@ def show_analisis_stok():
                 supplier=supplier, is_termurah=is_termurah, harga_master=harga_m if harga_m != float('inf') else 0.0
             )
             
-            html_output += "<div style='display: flex; border-bottom: 1px solid #f0f0f0; padding: 10px 0;'>"
-            html_output += f"<div style='flex: 1.5; padding-right: 15px;'>{c1_html}</div>"
-            html_output += f"<div style='flex: 1.5; padding-right: 15px;'>{c2_html}</div>"
-            html_output += f"<div style='flex: 1.2; padding-right: 15px;'>{c3_html}</div>"
-            html_output += f"<div style='flex: 1.3;'>{c4_html}</div>"
-            html_output += "</div>"
+            current_chunk += "<div style='display: flex; border-bottom: 1px solid #f0f0f0; padding: 10px 0;'>"
+            current_chunk += f"<div style='flex: 1.5; padding-right: 15px;'>{c1_html}</div>"
+            current_chunk += f"<div style='flex: 1.5; padding-right: 15px;'>{c2_html}</div>"
+            current_chunk += f"<div style='flex: 1.2; padding-right: 15px;'>{c3_html}</div>"
+            current_chunk += f"<div style='flex: 1.3;'>{c4_html}</div>"
+            current_chunk += "</div>"
             
-        st.markdown(html_output, unsafe_allow_html=True)
+            count += 1
+            if count >= chunk_size:
+                st.markdown(current_chunk, unsafe_allow_html=True)
+                current_chunk = ""
+                count = 0
+                
+        if current_chunk:
+            st.markdown(current_chunk, unsafe_allow_html=True)
