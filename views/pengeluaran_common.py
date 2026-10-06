@@ -534,7 +534,7 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
                 st.session_state[state_items_key] = [0]
                 st.session_state[state_defaults_key] = []
         elif tab_name == "Karyawan":
-            default_names = ["Susu Ultra", "Susu Ultramini", "Telur", "Telor", "Plastik Wayang"]
+            default_names = ["Susu Ultra", "Susu Ultramini", "Telor Ayam Negeri", "Telor", "Plastik Wayang"]
             valid_defaults = []
             
             for d in default_names:
