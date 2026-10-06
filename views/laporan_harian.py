@@ -404,6 +404,14 @@ def show_laporan_harian():
     total_masuk_qty = f_masuk['qty'].sum() if not f_masuk.empty and 'qty' in f_masuk.columns else 0
     total_masuk_rp = f_masuk['total_harga'].sum() if not f_masuk.empty and 'total_harga' in f_masuk.columns else 0
     
+    efisiensi_belanja = 0
+    if not f_masuk.empty:
+        df_masuk_eff = f_masuk.copy()
+        df_masuk_eff['qty_n'] = pd.to_numeric(df_masuk_eff['qty'], errors='coerce').fillna(0)
+        df_masuk_eff['hm_n'] = pd.to_numeric(df_masuk_eff['harga_master'], errors='coerce').fillna(0)
+        df_masuk_eff['hr_n'] = pd.to_numeric(df_masuk_eff['harga_real'], errors='coerce').fillna(0)
+        efisiensi_belanja = sum((df_masuk_eff['hm_n'] - df_masuk_eff['hr_n']) * df_masuk_eff['qty_n'])
+        
     with st.container(border=True):
         st.markdown('<span class="card-belanja-marker"></span>', unsafe_allow_html=True)
         st.markdown("##### 📥 Rangkuman Belanja / Masuk")
@@ -411,6 +419,16 @@ def show_laporan_harian():
         m1.metric("Total Qty Masuk", f"{format_qty(total_masuk_qty)} Qty")
         m2.metric("Total Pembelian (Rp)", f"Rp {total_masuk_rp:,.0f}")
         
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        if efisiensi_belanja > 0:
+            st.metric("💡 Status Efisiensi Belanja", f"Hemat Rp {efisiensi_belanja:,.0f}")
+        elif efisiensi_belanja < 0:
+            st.metric("📉 Status Efisiensi Belanja", f"Rugi Rp {abs(efisiensi_belanja):,.0f}")
+        else:
+            st.metric("⚖️ Status Efisiensi Belanja", "Sesuai HPP (Rp 0)")
+            
     st.markdown("<br>", unsafe_allow_html=True)
     
     with st.container(border=True):
