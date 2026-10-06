@@ -581,6 +581,7 @@ def show_riwayat_pengeluaran_pasien():
             selected_k_shift = st.selectbox("🕒 Filter Shift:", ["Semua Shift"] + all_shifts, key="rwp_filter_shift")
 
         raw_sups = [str(s).strip() for s in trx_pasien_df['supplier'].dropna().unique() if str(s).strip() and str(s).strip().lower() not in ['nan', 'none', '-']] if not trx_pasien_df.empty and 'supplier' in trx_pasien_df.columns else []
+        raw_suppliers = extract_unique_suppliers(master_df)
         all_sups = ["Semua Supplier"] + sorted(list(set(raw_sups + raw_suppliers)))
         with c_k_sup:
             selected_k_sup = st.selectbox("🏢 Filter Supplier:", all_sups, key="rwp_filter_sup")
