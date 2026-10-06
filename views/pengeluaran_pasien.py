@@ -10,7 +10,7 @@ from views.transaksi import extract_unique_suppliers
 def show_pengeluaran_pasien():
     col_title, col_date = st.columns([2.8, 1.4])
     with col_title:
-        st.title("🛏️ Pengeluaran Pasien")
+        st.title("🛏️ Pengeluaran Masak / Pasien")
     with col_date:
         st.markdown('<span class="timestamp-blue-marker"></span>', unsafe_allow_html=True)
         tgl_transaksi = st.date_input("📅 Tanggal Transaksi", value=datetime.date.today(), key="tgl_trx_pasien")
@@ -68,12 +68,12 @@ def show_pengeluaran_pasien():
         with c1:
             shift = st.selectbox("Keterangan Waktu \*", ["Pagi (07:00-15:00)", "Siang (15:00-22:00)", "Malam (22:00-07:00)", "1 Hari"], key=f"shift_{tab_name}")
         with c2:
-            kategori_options = ["VIP", "Kelas 1", "Kelas 2", "Kelas 3", "Maksi", "OK"]
-            kategori_selected = st.multiselect("Pilih Kategori Kelas \\*", kategori_options, default=["VIP", "Kelas 1", "Kelas 2", "Kelas 3", "Maksi", "OK"], key=f"kat_{tab_name}")
+            kategori_options = ["VIP", "Kelas 1", "Kelas 2", "Kelas 3", "Maksi", "OK", "Dokter"]
+            kategori_selected = st.multiselect("Pilih Kategori Kelas \\*", kategori_options, default=["VIP", "Kelas 1", "Kelas 2", "Kelas 3", "Maksi", "OK", "Dokter"], key=f"kat_{tab_name}")
             
         st.divider()
-        st.markdown("##### 1. Jumlah Pasien")
-        st.caption("Masukkan jumlah pasien untuk masing-masing kelas yang Anda pilih di atas.")
+        st.markdown("##### 1. Jumlah Porsi / Pasien")
+        st.caption("Masukkan estimasi porsi/jumlah orang untuk masing-masing kategori yang Anda pilih di atas.")
         
         distribusi = []
         total_pasien = 0
@@ -83,11 +83,11 @@ def show_pengeluaran_pasien():
         else:
             cols = st.columns(len(kategori_selected))
             for i, kat in enumerate(kategori_selected):
-                jml = cols[i].number_input(f"Jml Pasien {kat}", min_value=1, step=1, value=1, key=f"jml_pasien_{kat}_{rc}")
+                jml = cols[i].number_input(f"Porsi {kat}", min_value=1, step=1, value=1, key=f"jml_pasien_{kat}_{rc}")
                 distribusi.append((kat, jml))
                 total_pasien += jml
                 
-            st.info(f"**Total Keseluruhan Pasien:** {total_pasien} orang")
+            st.info(f"**Total Keseluruhan Porsi:** {total_pasien} porsi")
             
         st.divider()
         st.markdown("##### 2. Input Barang / Bahan Mentah")

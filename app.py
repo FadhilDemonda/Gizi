@@ -105,7 +105,7 @@ def main():
     elif kategori_menu == "📦 Input & Transaksi":
         menu = st.sidebar.radio("Halaman:", [
             "Input Stok Masuk", 
-            "Pengeluaran Pasien", 
+            "Pengeluaran Masak / Pasien", 
             "Pengeluaran Dokter", 
             "Pengeluaran Manajemen",
             "Pengeluaran Karyawan"
@@ -148,8 +148,8 @@ def main():
         render_page_safely(show_transaksi, "Input Stok Masuk")
     elif menu in ["Riwayat Pengeluaran & Harga", "Input Riwayat Pengeluaran", "Input Riwayat Harga", "Riwayat Pengeluaran"]:
         render_page_safely(show_riwayat_pengeluaran, "Riwayat Pengeluaran & Harga")
-    elif menu == "Pengeluaran Pasien":
-        render_page_safely(show_pengeluaran_pasien, "Pengeluaran Pasien")
+    elif menu == "Pengeluaran Masak / Pasien":
+        render_page_safely(show_pengeluaran_pasien, "Pengeluaran Masak / Pasien")
     elif menu == "Pengeluaran Dokter":
         render_page_safely(show_pengeluaran_dokter, "Pengeluaran Dokter")
     elif menu == "Pengeluaran Manajemen":
