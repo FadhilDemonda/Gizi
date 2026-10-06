@@ -289,6 +289,10 @@ def show_dashboard():
     total_hpp = (hist_keluar['qty'] * hist_keluar['harga_master']).sum() if not hist_keluar.empty and 'harga_master' in hist_keluar.columns and 'qty' in hist_keluar.columns else 0
     total_margin = total_pengeluaran - total_hpp
     
+    # Calculate Efisiensi Belanja
+    hpp_belanja_masuk = (hist_masuk['qty'] * pd.to_numeric(hist_masuk['harga_master'], errors='coerce')).sum() if not hist_masuk.empty and 'harga_master' in hist_masuk.columns else 0
+    efisiensi_belanja = hpp_belanja_masuk - total_belanja_masuk
+    
     def format_qty(val):
         try:
             s = f"{float(val):,.2f}"
@@ -298,10 +302,16 @@ def show_dashboard():
         except:
             return val
             
-    m1, m2, m3 = st.columns(3)
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("Stok Fisik Gudang", f"{format_qty(total_stok_sekarang)} Qty")
     m2.metric("Volume Masuk", f"{format_qty(total_masuk)} Qty")
     m3.metric("Volume Keluar", f"{format_qty(total_keluar_qty)} Qty")
+    if efisiensi_belanja > 0:
+        m4.metric("Status Efisiensi", f"Hemat Rp {efisiensi_belanja:,.0f}")
+    elif efisiensi_belanja < 0:
+        m4.metric("Status Efisiensi", f"Rugi Rp {abs(efisiensi_belanja):,.0f}")
+    else:
+        m4.metric("Status Efisiensi", "Sesuai HPP (Rp 0)")
     
     st.markdown("---")
     st.markdown("<br>", unsafe_allow_html=True)
@@ -524,6 +534,9 @@ def show_dashboard():
             
         # 4. Status Rugi
         summary_df['STATUS RUGI DENGAN HPP'] = summary_df['TOTAL PEMBELIAN BERDASARKAN HPP'] - summary_df['TOTAL PEMBELIAN']
+        
+        # Urutkan berdasarkan Status Rugi (angka paling negatif di atas)
+        summary_df = summary_df.sort_values(by='STATUS RUGI DENGAN HPP', ascending=True)
         
         # Format the dataframe
         disp_summary = summary_df.copy()

@@ -535,6 +535,32 @@ def render_form(tab_name, sheet_name, categories, tgl_transaksi=None):
             else:
                 st.session_state[state_items_key] = [0]
                 st.session_state[state_defaults_key] = []
+        elif tab_name == "Karyawan":
+            default_names = ["Susu Ultra", "Susu Ultramini", "Telur", "Telor", "Plastik Wayang"]
+            valid_defaults = []
+            
+            for d in default_names:
+                match = None
+                for item in item_options:
+                    if d.lower().strip() == str(item).lower().strip():
+                        match = item; break
+                if not match:
+                    for item in item_options:
+                        if str(item).lower().strip().startswith(d.lower().strip()):
+                            match = item; break
+                if not match:
+                    for item in item_options:
+                        if d.lower().strip() in str(item).lower().strip():
+                            match = item; break
+                if match and match not in valid_defaults:
+                    valid_defaults.append(match)
+                        
+            if valid_defaults:
+                st.session_state[state_items_key] = list(range(len(valid_defaults)))
+                st.session_state[state_defaults_key] = valid_defaults
+            else:
+                st.session_state[state_items_key] = [0]
+                st.session_state[state_defaults_key] = []
         else:
             st.session_state[state_items_key] = [0]
             st.session_state[state_defaults_key] = []

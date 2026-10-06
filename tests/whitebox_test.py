@@ -489,7 +489,7 @@ def test_formatting():
     run_test("Header HTML: jumlah item negatif (-1) -> di-clamp ke 0 (SECURE)", t_header_xss)
 
     def t_row_xss_nama():
-        c1, c2, c3 = get_row_html(
+        c1, c2, c3, c4 = get_row_html(
             '<script>alert("XSS")</script>',  # nama_barang
             '"; DROP TABLE--',  # kode
             -999, "kg", 0, -50,
@@ -500,7 +500,7 @@ def test_formatting():
     run_test("Row HTML: XSS di nama_barang -> ter-escape aman (SECURE)", t_row_xss_nama)
 
     def t_row_negative_bar():
-        c1, c2, c3 = get_row_html(
+        c1, c2, c3, c4 = get_row_html(
             "Test", "T001", -100, "pcs", -50, -200,
             "BUG", "#000", "#000", "#000", "?", "Error"
         )
@@ -508,7 +508,7 @@ def test_formatting():
     run_test("Row HTML: semua nilai negatif -> tidak crash", t_row_negative_bar)
 
     def t_row_huge_values():
-        c1, c2, c3 = get_row_html(
+        c1, c2, c3, c4 = get_row_html(
             "A" * 500, "B" * 500, 99999999, "satuan_panjang" * 10, 99999999, 999,
             "STATUS_PANJANG" * 10, "#fff", "#000", "#333", "X" * 20, "EST" * 50
         )
@@ -516,14 +516,14 @@ def test_formatting():
     run_test("Row HTML: string & angka sangat panjang", t_row_huge_values)
 
     def t_row_empty_strings():
-        c1, c2, c3 = get_row_html("", "", 0, "", 0, 0, "", "", "", "", "", "")
+        c1, c2, c3, c4 = get_row_html("", "", 0, "", 0, 0, "", "", "", "", "", "")
         assert c1 is not None
     run_test("Row HTML: semua string kosong", t_row_empty_strings)
 
     def t_row_none_satuan():
         # Ini bisa crash kalau ada f-string yang menerima None
         try:
-            c1, c2, c3 = get_row_html("Test", "T001", 10, None, 5, 50, "OK", "#0f0", "#efe", "#0f0", "V", "OK")
+            c1, c2, c3, c4 = get_row_html("Test", "T001", 10, None, 5, 50, "OK", "#0f0", "#efe", "#0f0", "V", "OK")
             assert True  # Didn't crash
         except TypeError:
             raise AssertionError("Crashed when satuan=None!")

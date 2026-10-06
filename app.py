@@ -11,6 +11,7 @@ from views.pengeluaran import (
     show_pengeluaran_pasien, 
     show_pengeluaran_dokter, 
     show_pengeluaran_manajemen,
+    show_pengeluaran_karyawan,
     show_riwayat_pengeluaran
 )
 from views.laporan_harian import show_laporan_harian
@@ -106,7 +107,8 @@ def main():
             "Input Stok Masuk", 
             "Pengeluaran Pasien", 
             "Pengeluaran Dokter", 
-            "Pengeluaran Manajemen"
+            "Pengeluaran Manajemen",
+            "Pengeluaran Karyawan"
         ])
     elif kategori_menu == "⚙️ Pengaturan Data":
         menu = st.sidebar.radio("Halaman:", [
@@ -152,6 +154,8 @@ def main():
         render_page_safely(show_pengeluaran_dokter, "Pengeluaran Dokter")
     elif menu == "Pengeluaran Manajemen":
         render_page_safely(show_pengeluaran_manajemen, "Pengeluaran Manajemen")
+    elif menu == "Pengeluaran Karyawan":
+        render_page_safely(show_pengeluaran_karyawan, "Pengeluaran Karyawan")
     elif menu == "Laporan Harian":
         render_page_safely(show_laporan_harian, "Laporan Harian")
     elif menu == "Master Barang":

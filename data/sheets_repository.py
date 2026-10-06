@@ -14,6 +14,7 @@ SHEET_STOK_MASUK = "stok_masuk"
 SHEET_PENGELUARAN_PASIEN = "pengeluaran_pasien"
 SHEET_PENGELUARAN_DOKTER = "pengeluaran_dokter"
 SHEET_PENGELUARAN_MANAJEMEN = "pengeluaran_manajemen"
+SHEET_PENGELUARAN_KARYAWAN = "pengeluaran_karyawan"
 SHEET_MASTER_DOKTER = "master_dokter"
 
 SHEET_LOG = "log"

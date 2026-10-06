@@ -63,7 +63,7 @@ def show_analisis_stok():
         sup_filter = st.multiselect("Supplier:", available_sups, placeholder="Filter by Supplier...", label_visibility="collapsed")
     with col_filter:
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-        status_filter = st.multiselect("Status:", ["Krisis", "Minimum", "Aman", "Bahan Bebas"], default=["Krisis", "Minimum", "Aman"], label_visibility="collapsed")
+        status_filter = st.multiselect("Status:", ["Krisis", "Minimum", "Aman", "Bahan Bebas"], default=["Krisis", "Minimum", "Aman", "Bahan Bebas"], label_visibility="collapsed")
     with col_search:
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
         search_q = st.text_input("🔍 Cari Barang (Nama / SKU):", placeholder="Ketik nama atau kode barang...", label_visibility="collapsed")
@@ -104,11 +104,27 @@ def show_analisis_stok():
         else:
             st.success("✅ **Semua Stok Aman!** Tidak ada barang yang tercatat.")
     else:
-        h_col1, h_col2, h_col3 = st.columns([2, 2, 1.5])
+        h_col1, h_col2, h_col3, h_col4 = st.columns([1.5, 1.5, 1.2, 1.3])
         with h_col1: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>DETAIL BARANG & SKU</span>", unsafe_allow_html=True)
         with h_col2: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>LEVEL STOK SAAT INI</span>", unsafe_allow_html=True)
         with h_col3: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>STATUS & ESTIMASI</span>", unsafe_allow_html=True)
+        with h_col4: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>SUPPLIER TERMURAH</span>", unsafe_allow_html=True)
         st.markdown("<hr style='margin-top: 5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+        
+        full_df['harga_master_numeric'] = pd.to_numeric(full_df['harga_master'], errors='coerce').fillna(float('inf'))
+        full_df['stok_sekarang_numeric'] = pd.to_numeric(full_df['stok_sekarang'], errors='coerce').fillna(0)
+        
+        # Hitung total stok per barang dari semua supplier
+        total_stok = full_df.groupby('nama_barang')['stok_sekarang_numeric'].sum()
+        min_prices = full_df.groupby('nama_barang')['harga_master_numeric'].min()
+        
+        # Urutkan berdasarkan harga termurah lalu hapus duplikat (hanya simpan 1 barang termurah)
+        full_df = full_df.sort_values(by=['nama_barang', 'harga_master_numeric']).drop_duplicates(subset=['nama_barang'], keep='first')
+        
+        # Kembalikan urutan berdasarkan persentase stok
+        full_df['stok_sekarang'] = full_df['nama_barang'].map(total_stok)
+        full_df['persentase'] = full_df['stok_sekarang'] / full_df['stok_minimum_safe']
+        full_df = full_df.sort_values(by='persentase')
         
         for _, row in full_df.iterrows():
             stok = row['stok_sekarang']
@@ -117,17 +133,25 @@ def show_analisis_stok():
             kat = row.get('kategori', '')
             status_flag = str(row.get('status', 'True')).upper() in ['TRUE', '1', 'YES', 'T']
             
+            # Klasifikasi ulang status berdasarkan total stok gabungan
             status_text, color_hex, bg_color, text_color, icon, estimasi = classify_stock_status(stok, minimum, pct, kat, status=status_flag)
             bar_width = calculate_bar_width(stok, minimum)
             
-            c1_html, c2_html, c3_html = get_row_html(
+            item_name = row['nama_barang']
+            harga_m = row['harga_master_numeric']
+            is_termurah = (harga_m == min_prices.get(item_name, -1) and harga_m != float('inf'))
+            supplier = row.get('supplier', '')
+            
+            c1_html, c2_html, c3_html, c4_html = get_row_html(
                 row['nama_barang'], row['kode_barang'], stok, row['satuan'], 
-                minimum, bar_width, status_text, color_hex, bg_color, text_color, icon, estimasi
+                minimum, bar_width, status_text, color_hex, bg_color, text_color, icon, estimasi,
+                supplier=supplier, is_termurah=is_termurah, harga_master=harga_m if harga_m != float('inf') else 0.0
             )
             
             with st.container():
-                c1, c2, c3 = st.columns([2, 2, 1.5])
+                c1, c2, c3, c4 = st.columns([1.5, 1.5, 1.2, 1.3])
                 with c1: st.markdown(c1_html, unsafe_allow_html=True)
                 with c2: st.markdown(c2_html, unsafe_allow_html=True)
                 with c3: st.markdown(c3_html, unsafe_allow_html=True)
+                with c4: st.markdown(c4_html, unsafe_allow_html=True)
                 st.markdown("<hr style='margin: 0; padding: 0;'>", unsafe_allow_html=True)

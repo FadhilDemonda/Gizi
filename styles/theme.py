@@ -13,6 +13,19 @@ def inject_custom_css():
             font-family: 'Plus Jakarta Sans', sans-serif !important;
         }
         
+        /* Fix Metric Truncation for Scorecards */
+        div[data-testid="stMetricValue"] > div {
+            overflow: visible !important;
+            text-overflow: unset !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+            line-height: 1.2 !important;
+            font-size: 1.6rem !important;
+        }
+        div[data-testid="stMetricValue"] {
+            overflow: visible !important;
+        }
+        
         /* Soft subtle animation for everything */
         * {
             transition: background-color 0.1s, border-color 0.1s;

@@ -33,14 +33,17 @@ def get_row_html(
     bg_color: str, 
     text_color: str, 
     icon: str, 
-    estimasi: str
-) -> tuple[str, str, str]:
+    estimasi: str,
+    supplier: str = "",
+    is_termurah: bool = False,
+    harga_master: float = 0.0
+) -> tuple[str, str, str, str]:
     """
     Generate HTML snippets for the three columns of a dashboard item row.
     Safely escapes dynamic text fields to prevent HTML/XSS injection.
     
     Returns:
-        tuple[str, str, str]: (col1_html, col2_html, col3_html)
+        tuple[str, str, str, str]: (col1_html, col2_html, col3_html, col4_html)
     """
     safe_nama = html.escape(str(nama_barang))
     safe_kode = html.escape(str(kode_barang))
@@ -49,6 +52,15 @@ def get_row_html(
     safe_icon = html.escape(str(icon))
     safe_estimasi = html.escape(str(estimasi))
     safe_bar = max(0, min(100, int(bar_width)))
+    safe_supplier = html.escape(str(supplier))
+    
+    termurah_html = ""
+    if is_termurah:
+        termurah_html = f"<span style='background-color: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; margin-left: 6px;'>🌟 Termurah</span>"
+
+    supplier_html = ""
+    if safe_supplier and safe_supplier != "-" and safe_supplier != "nan":
+        supplier_html = f"<div style='font-size: 0.8rem; color: #0369a1; margin-top: 2px;'>🏢 {safe_supplier} | Rp {harga_master:,.0f} {termurah_html}</div>"
 
     c1 = f"""
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
@@ -82,4 +94,10 @@ def get_row_html(
         <div style="font-size: 0.8rem; color: gray;">⏱️ {safe_estimasi}</div>
     </div>
     """
-    return c1, c2, c3
+    c4 = f"""
+    <div style="margin-bottom: 10px;">
+        {supplier_html}
+    </div>
+    """
+    
+    return c1, c2, c3, c4

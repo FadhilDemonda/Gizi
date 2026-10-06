@@ -68,8 +68,8 @@ def show_pengeluaran_pasien():
         with c1:
             shift = st.selectbox("Keterangan Waktu \*", ["Pagi (07:00-15:00)", "Siang (15:00-22:00)", "Malam (22:00-07:00)", "1 Hari"], key=f"shift_{tab_name}")
         with c2:
-            kategori_options = ["VIP", "Kelas 1", "Kelas 2", "Kelas 3"]
-            kategori_selected = st.multiselect("Pilih Kategori Kelas \*", kategori_options, default=["VIP", "Kelas 1", "Kelas 2", "Kelas 3"], key=f"kat_{tab_name}")
+            kategori_options = ["VIP", "Kelas 1", "Kelas 2", "Kelas 3", "Maksi", "OK"]
+            kategori_selected = st.multiselect("Pilih Kategori Kelas \\*", kategori_options, default=["VIP", "Kelas 1", "Kelas 2", "Kelas 3", "Maksi", "OK"], key=f"kat_{tab_name}")
             
         st.divider()
         st.markdown("##### 1. Jumlah Pasien")
@@ -569,7 +569,7 @@ def show_riwayat_pengeluaran_pasien():
                 k_start, k_end = date_range, date_range
 
         raw_kats = [str(k).strip() for k in trx_pasien_df['kategori'].dropna().unique() if str(k).strip() and str(k).strip().lower() not in ['nan', 'none']] if not trx_pasien_df.empty and 'kategori' in trx_pasien_df.columns else []
-        default_kats = ["VIP", "Kelas 1", "Kelas 2", "Kelas 3"]
+        default_kats = ["VIP", "Kelas 1", "Kelas 2", "Kelas 3", "Maksi", "OK"]
         all_kats = list(dict.fromkeys(default_kats + raw_kats))
         with c_k_kat:
             selected_k_kat = st.selectbox("🛏️ Filter Kategori Kelas:", ["Semua Kelas"] + all_kats, key="rwp_filter_kat")

@@ -12,6 +12,7 @@ from data.sheets_repository import SHEET_PENGELUARAN_MANAJEMEN
 from views.pengeluaran_common import render_form
 from views.pengeluaran_pasien import show_pengeluaran_pasien
 from views.pengeluaran_dokter import show_pengeluaran_dokter
+from views.pengeluaran_karyawan import show_pengeluaran_karyawan
 from views.riwayat_pengeluaran import show_riwayat_pengeluaran
 show_riwayat_pengeluaran_pasien = show_riwayat_pengeluaran
 
