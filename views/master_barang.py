@@ -156,6 +156,11 @@ def show_master_barang():
         hide_index=True,
         num_rows="dynamic",
         key=f"master_editor_{selected_sup}_{selected_cat}",
+        column_order=[
+            "kode_barang", "nama_barang", "kategori", "supplier", 
+            "satuan", "status", "stok_minimum", "stok_sekarang", 
+            "harga_master", "harga_real", "Sumber HPP"
+        ],
         column_config={
             "supplier": st.column_config.TextColumn(
                 "Supplier",
