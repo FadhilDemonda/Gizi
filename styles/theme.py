@@ -14,16 +14,18 @@ def inject_custom_css():
         }
         
         /* Fix Metric Truncation for Scorecards */
-        div[data-testid="stMetricValue"] > div {
+        div[data-testid="stMetricValue"], 
+        div[data-testid="stMetricValue"] > div,
+        div[data-testid="stMetricValue"] span {
             overflow: visible !important;
-            text-overflow: unset !important;
+            text-overflow: clip !important;
             white-space: normal !important;
-            word-break: break-word !important;
+            word-wrap: break-word !important;
             line-height: 1.2 !important;
-            font-size: 1.6rem !important;
         }
+        
         div[data-testid="stMetricValue"] {
-            overflow: visible !important;
+            font-size: 1.6rem !important;
         }
         
         /* Soft subtle animation for everything */

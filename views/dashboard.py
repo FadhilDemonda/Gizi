@@ -535,6 +535,13 @@ def show_dashboard():
         # 4. Status Rugi
         summary_df['STATUS RUGI DENGAN HPP'] = summary_df['TOTAL PEMBELIAN BERDASARKAN HPP'] - summary_df['TOTAL PEMBELIAN']
         
+        def label_status(val):
+            if val > 0: return "🟢 Hemat"
+            elif val < 0: return "🔴 Rugi"
+            return "⚪ Sesuai"
+            
+        summary_df['STATUS EFISIENSI'] = summary_df['STATUS RUGI DENGAN HPP'].apply(label_status)
+        
         # Urutkan berdasarkan Status Rugi (angka paling negatif di atas)
         summary_df = summary_df.sort_values(by='STATUS RUGI DENGAN HPP', ascending=True)
         
@@ -552,7 +559,19 @@ def show_dashboard():
     
     with tab_masuk:
         if not hist_masuk.empty:
-            cols_m = ['tanggal', 'shift', 'supplier', 'nama_barang', 'qty', 'harga_master', 'harga_real', 'total_harga', 'keterangan']
+            hm_temp = hist_masuk.copy()
+            hm_temp['hm_num'] = pd.to_numeric(hm_temp['harga_master'], errors='coerce').fillna(0)
+            hm_temp['hr_num'] = pd.to_numeric(hm_temp['harga_real'], errors='coerce').fillna(0)
+            
+            def eval_efisiensi(r):
+                if r['hm_num'] == 0 or r['hr_num'] == 0: return "-"
+                if r['hr_num'] < r['hm_num']: return "🟢 Hemat"
+                if r['hr_num'] > r['hm_num']: return "🔴 Rugi"
+                return "⚪ Sesuai"
+                
+            hist_masuk['status_efisiensi'] = hm_temp.apply(eval_efisiensi, axis=1)
+            
+            cols_m = ['tanggal', 'shift', 'supplier', 'nama_barang', 'qty', 'harga_master', 'harga_real', 'total_harga', 'status_efisiensi', 'keterangan']
             avail_m = [c for c in cols_m if c in hist_masuk.columns]
             display_masuk = hist_masuk[avail_m].copy()
             for c in ['harga_master', 'harga_real', 'total_harga']:
