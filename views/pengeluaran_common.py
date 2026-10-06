@@ -287,7 +287,6 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
                 if k.startswith(f"chk_multi_{state_items_key}_"):
                     del st.session_state[k]
             st.session_state[ver_key] = c_ver + 1
-            st.rerun()
     with c_btn2:
         if st.button("🔲 Kosongkan Semua", use_container_width=True):
             st.session_state[temp_key].clear()
@@ -295,7 +294,6 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
                 if k.startswith(f"chk_multi_{state_items_key}_"):
                     del st.session_state[k]
             st.session_state[ver_key] = c_ver + 1
-            st.rerun()
             
     new_dialog_set = set([x for x in st.session_state[temp_key] if x not in item_options])
     

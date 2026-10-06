@@ -142,13 +142,11 @@ def multi_select_dialog(master_df, state_items_key, state_defaults_key, current_
             for it in item_options:
                 st.session_state['dialog_sel_items_set'].add(it)
                 st.session_state[f"chk_dlg_trans_{it}"] = True
-            st.rerun()
     with c_desel:
         if st.button("⬜ Reset Pilihan", key="btn_dlg_desel", use_container_width=True):
             for it in list(st.session_state['dialog_sel_items_set']):
                 st.session_state[f"chk_dlg_trans_{it}"] = False
             st.session_state['dialog_sel_items_set'].clear()
-            st.rerun()
             
     with st.container(height=350, border=True):
         if not item_options:

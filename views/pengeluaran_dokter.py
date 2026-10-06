@@ -142,7 +142,6 @@ def pilih_dokter_dialog(df_docs, state_doc_key, kategori):
                 if k.startswith("chk_doc_"):
                     del st.session_state[k]
             st.session_state[ver_key] = doc_ver + 1
-            st.rerun()
     with c_btn2:
         if st.button("🔲 Kosongkan", use_container_width=True):
             st.session_state[temp_key].clear()
@@ -150,7 +149,6 @@ def pilih_dokter_dialog(df_docs, state_doc_key, kategori):
                 if k.startswith("chk_doc_"):
                     del st.session_state[k]
             st.session_state[ver_key] = doc_ver + 1
-            st.rerun()
             
     new_dialog_set = set([x for x in st.session_state[temp_key] if x not in docs_to_show])
     
