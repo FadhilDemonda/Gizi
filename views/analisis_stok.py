@@ -104,12 +104,15 @@ def show_analisis_stok():
         else:
             st.success("✅ **Semua Stok Aman!** Tidak ada barang yang tercatat.")
     else:
-        h_col1, h_col2, h_col3, h_col4 = st.columns([1.5, 1.5, 1.2, 1.3])
-        with h_col1: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>DETAIL BARANG & SKU</span>", unsafe_allow_html=True)
-        with h_col2: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>LEVEL STOK SAAT INI</span>", unsafe_allow_html=True)
-        with h_col3: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>STATUS & ESTIMASI</span>", unsafe_allow_html=True)
-        with h_col4: st.markdown("<span style='color: gray; font-size: 0.85rem; font-weight: 700;'>SUPPLIER TERMURAH</span>", unsafe_allow_html=True)
-        st.markdown("<hr style='margin-top: 5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+        # HEADER
+        html_output = """
+        <div style='display: flex; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px;'>
+            <div style='flex: 1.5; color: gray; font-size: 0.85rem; font-weight: 700;'>DETAIL BARANG & SKU</div>
+            <div style='flex: 1.5; color: gray; font-size: 0.85rem; font-weight: 700;'>LEVEL STOK SAAT INI</div>
+            <div style='flex: 1.2; color: gray; font-size: 0.85rem; font-weight: 700;'>STATUS & ESTIMASI</div>
+            <div style='flex: 1.3; color: gray; font-size: 0.85rem; font-weight: 700;'>SUPPLIER TERMURAH</div>
+        </div>
+        """
         
         full_df['harga_master_numeric'] = pd.to_numeric(full_df['harga_master'], errors='coerce').fillna(float('inf'))
         full_df['stok_sekarang_numeric'] = pd.to_numeric(full_df['stok_sekarang'], errors='coerce').fillna(0)
@@ -148,10 +151,13 @@ def show_analisis_stok():
                 supplier=supplier, is_termurah=is_termurah, harga_master=harga_m if harga_m != float('inf') else 0.0
             )
             
-            with st.container():
-                c1, c2, c3, c4 = st.columns([1.5, 1.5, 1.2, 1.3])
-                with c1: st.markdown(c1_html, unsafe_allow_html=True)
-                with c2: st.markdown(c2_html, unsafe_allow_html=True)
-                with c3: st.markdown(c3_html, unsafe_allow_html=True)
-                with c4: st.markdown(c4_html, unsafe_allow_html=True)
-                st.markdown("<hr style='margin: 0; padding: 0;'>", unsafe_allow_html=True)
+            html_output += f"""
+            <div style='display: flex; border-bottom: 1px solid #f0f0f0; padding: 10px 0;'>
+                <div style='flex: 1.5; padding-right: 15px;'>{c1_html}</div>
+                <div style='flex: 1.5; padding-right: 15px;'>{c2_html}</div>
+                <div style='flex: 1.2; padding-right: 15px;'>{c3_html}</div>
+                <div style='flex: 1.3;'>{c4_html}</div>
+            </div>
+            """
+            
+        st.markdown(html_output, unsafe_allow_html=True)
