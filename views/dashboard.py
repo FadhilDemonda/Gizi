@@ -4,7 +4,7 @@ import datetime
 import plotly.express as px
 from data.sheets_repository import (
     get_sheet_data, SHEET_MASTER, SHEET_STOK_MASUK, 
-    SHEET_PENGELUARAN_PASIEN, SHEET_PENGELUARAN_DOKTER, SHEET_PENGELUARAN_MANAJEMEN
+    SHEET_PENGELUARAN_PASIEN, SHEET_PENGELUARAN_DOKTER, SHEET_PENGELUARAN_MANAJEMEN, SHEET_PENGELUARAN_KARYAWAN
 )
 
 from views.transaksi import extract_unique_suppliers, match_supplier
@@ -147,7 +147,7 @@ def show_dashboard():
     col_sup, col_item, col_date = st.columns([1.2, 1.5, 1.5])
     
     with col_sup:
-        all_dfs_sup = [master_df, get_sheet_data(SHEET_STOK_MASUK), get_sheet_data(SHEET_PENGELUARAN_PASIEN), get_sheet_data(SHEET_PENGELUARAN_DOKTER), get_sheet_data(SHEET_PENGELUARAN_MANAJEMEN)]
+        all_dfs_sup = [master_df, get_sheet_data(SHEET_STOK_MASUK), get_sheet_data(SHEET_PENGELUARAN_PASIEN), get_sheet_data(SHEET_PENGELUARAN_DOKTER), get_sheet_data(SHEET_PENGELUARAN_MANAJEMEN), get_sheet_data(SHEET_PENGELUARAN_KARYAWAN)]
         supp_list = extract_unique_suppliers(pd.concat([d for d in all_dfs_sup if not d.empty and isinstance(d, pd.DataFrame)], ignore_index=True))
         sup_options = ["Semua Supplier"] + supp_list
         selected_sup = st.selectbox("🏢 Filter Supplier:", sup_options, index=0, key="dash_main_sup")
@@ -208,6 +208,7 @@ def show_dashboard():
     df_pasien = get_sheet_data(SHEET_PENGELUARAN_PASIEN)
     df_dokter = get_sheet_data(SHEET_PENGELUARAN_DOKTER)
     df_manajemen = get_sheet_data(SHEET_PENGELUARAN_MANAJEMEN)
+    df_karyawan = get_sheet_data(SHEET_PENGELUARAN_KARYAWAN)
     
     def filter_by_date(df):
         if df.empty or 'tanggal' not in df.columns:
@@ -221,6 +222,7 @@ def show_dashboard():
     df_pasien = filter_by_date(df_pasien)
     df_dokter = filter_by_date(df_dokter)
     df_manajemen = filter_by_date(df_manajemen)
+    df_karyawan = filter_by_date(df_karyawan)
     
     def filter_dash_by_sup(df, target_sup):
         if df.empty or target_sup == "Semua Supplier":
@@ -255,6 +257,7 @@ def show_dashboard():
     hist_pasien = df_pasien[df_pasien['nama_barang'].isin(selected_items)] if not df_pasien.empty and 'nama_barang' in df_pasien.columns else pd.DataFrame()
     hist_dokter = df_dokter[df_dokter['nama_barang'].isin(selected_items)] if not df_dokter.empty and 'nama_barang' in df_dokter.columns else pd.DataFrame()
     hist_manajemen = df_manajemen[df_manajemen['nama_barang'].isin(selected_items)] if not df_manajemen.empty and 'nama_barang' in df_manajemen.columns else pd.DataFrame()
+    hist_karyawan = df_karyawan[df_karyawan['nama_barang'].isin(selected_items)] if not df_karyawan.empty and 'nama_barang' in df_karyawan.columns else pd.DataFrame()
     
     # FILTER BY SUPPLIER (Pengeluaran & Belanja)
     if selected_sup != "Semua Supplier":
@@ -262,17 +265,20 @@ def show_dashboard():
         hist_pasien = filter_dash_by_sup(hist_pasien, selected_sup)
         hist_dokter = filter_dash_by_sup(hist_dokter, selected_sup)
         hist_manajemen = filter_dash_by_sup(hist_manajemen, selected_sup)
+        hist_karyawan = filter_dash_by_sup(hist_karyawan, selected_sup)
 
     # TAG THE SOURCES
     if not hist_pasien.empty: hist_pasien['Sumber'] = 'Pasien'
     if not hist_dokter.empty: hist_dokter['Sumber'] = 'Dokter'
     if not hist_manajemen.empty: hist_manajemen['Sumber'] = 'Manajemen'
+    if not hist_karyawan.empty: hist_karyawan['Sumber'] = 'Karyawan'
     
     # COMBINE PENGELUARAN
     dfs_keluar = []
     if not hist_pasien.empty: dfs_keluar.append(hist_pasien)
     if not hist_dokter.empty: dfs_keluar.append(hist_dokter)
     if not hist_manajemen.empty: dfs_keluar.append(hist_manajemen)
+    if not hist_karyawan.empty: dfs_keluar.append(hist_karyawan)
     
     hist_keluar = pd.concat(dfs_keluar, ignore_index=True) if dfs_keluar else pd.DataFrame()
 
@@ -330,7 +336,7 @@ def show_dashboard():
             
     with col_layanan:
         with st.container(border=True):
-            st.markdown("##### 👥 3 Kategori Layanan & Supplier")
+            st.markdown("##### 👥 4 Kategori Layanan & Supplier")
             if not hist_pasien.empty:
                 if 'jumlah_pasien' in hist_pasien.columns:
                     # Parse to numeric and fillna with 1 just in case, then group by transaction
@@ -344,14 +350,16 @@ def show_dashboard():
                 
             jml_dokter = hist_dokter['kategori_freetext'].nunique() if not hist_dokter.empty and 'kategori_freetext' in hist_dokter.columns else 0
             jml_manajemen = hist_manajemen['kategori_freetext'].nunique() if not hist_manajemen.empty and 'kategori_freetext' in hist_manajemen.columns else 0
+            jml_karyawan = hist_karyawan['kategori_freetext'].nunique() if not hist_karyawan.empty and 'kategori_freetext' in hist_karyawan.columns else 0
             
             cost_pasien = hist_pasien['total_harga'].sum() if not hist_pasien.empty and 'total_harga' in hist_pasien.columns else 0
             cost_dokter = hist_dokter['total_harga'].sum() if not hist_dokter.empty and 'total_harga' in hist_dokter.columns else 0
             cost_manajemen = hist_manajemen['total_harga'].sum() if not hist_manajemen.empty and 'total_harga' in hist_manajemen.columns else 0
+            cost_karyawan = hist_karyawan['total_harga'].sum() if not hist_karyawan.empty and 'total_harga' in hist_karyawan.columns else 0
             
-            total_entitas = jml_pasien + jml_dokter + jml_manajemen + jml_supplier
+            total_entitas = jml_pasien + jml_dokter + jml_manajemen + jml_karyawan + jml_supplier
             
-            e1, e2, e3, e4 = st.columns(4)
+            e1, e2, e3, e4, e5 = st.columns(5)
             with e1:
                 st.metric("Pasien", f"{jml_pasien} ")
                 st.caption(f"Rp {cost_pasien:,.0f}")
@@ -362,6 +370,9 @@ def show_dashboard():
                 st.metric("Manajemen", f"{jml_manajemen} ")
                 st.caption(f"Rp {cost_manajemen:,.0f}")
             with e4:
+                st.metric("Karyawan", f"{jml_karyawan} ")
+                st.caption(f"Rp {cost_karyawan:,.0f}")
+            with e5:
                 st.metric("Supplier", f"{jml_supplier} ")
                 st.caption(f"Rp {total_belanja_masuk:,.0f}")
             

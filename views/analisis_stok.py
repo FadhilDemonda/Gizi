@@ -128,11 +128,32 @@ def show_analisis_stok():
         full_df['persentase'] = full_df['stok_sekarang'] / full_df['stok_minimum_safe']
         full_df = full_df.sort_values(by='persentase')
         
+        # PAGINASI
+        items_per_page = 50
+        total_items = len(full_df)
+        total_pages = max(1, (total_items + items_per_page - 1) // items_per_page)
+        
+        if 'analisis_stok_page' not in st.session_state:
+            st.session_state['analisis_stok_page'] = 1
+            
+        current_page = st.session_state['analisis_stok_page']
+        
+        if current_page > total_pages:
+            current_page = total_pages
+            st.session_state['analisis_stok_page'] = total_pages
+        if current_page < 1:
+            current_page = 1
+            st.session_state['analisis_stok_page'] = 1
+            
+        start_idx = (current_page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        page_df = full_df.iloc[start_idx:end_idx]
+        
         chunk_size = 20
         current_chunk = ""
         count = 0
         
-        for _, row in full_df.iterrows():
+        for _, row in page_df.iterrows():
             stok = row['stok_sekarang']
             minimum = row['stok_minimum']
             pct = row['persentase']
@@ -169,3 +190,18 @@ def show_analisis_stok():
                 
         if current_chunk:
             st.markdown(current_chunk, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_info, col_prev, col_page, col_next = st.columns([2, 1, 1, 1])
+        with col_info:
+            st.markdown(f"<div style='padding-top: 5px; color: gray;'>Menampilkan {start_idx + 1}-{min(end_idx, total_items)} dari {total_items} barang</div>", unsafe_allow_html=True)
+        with col_prev:
+            if st.button("⬅️ Sebelumnya", disabled=(current_page == 1), use_container_width=True):
+                st.session_state['analisis_stok_page'] -= 1
+                st.rerun()
+        with col_page:
+            st.markdown(f"<div style='text-align: center; padding-top: 5px; font-weight: bold;'>Halaman {current_page} / {total_pages}</div>", unsafe_allow_html=True)
+        with col_next:
+            if st.button("Selanjutnya ➡️", disabled=(current_page == total_pages), use_container_width=True):
+                st.session_state['analisis_stok_page'] += 1
+                st.rerun()

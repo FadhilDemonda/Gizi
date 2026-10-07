@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 from data.sheets_repository import (
     get_sheet_data, SHEET_MASTER, SHEET_STOK_MASUK, 
-    SHEET_PENGELUARAN_PASIEN, SHEET_PENGELUARAN_DOKTER, SHEET_PENGELUARAN_MANAJEMEN
+    SHEET_PENGELUARAN_PASIEN, SHEET_PENGELUARAN_DOKTER, SHEET_PENGELUARAN_MANAJEMEN, SHEET_PENGELUARAN_KARYAWAN
 )
 from views.transaksi import extract_unique_suppliers, match_supplier
 
@@ -285,6 +285,7 @@ def show_laporan_harian():
     df_pasien = get_sheet_data(SHEET_PENGELUARAN_PASIEN)
     df_dokter = get_sheet_data(SHEET_PENGELUARAN_DOKTER)
     df_manajemen = get_sheet_data(SHEET_PENGELUARAN_MANAJEMEN)
+    df_karyawan = get_sheet_data(SHEET_PENGELUARAN_KARYAWAN)
     
     def filter_by_date(df):
         if df.empty or 'tanggal' not in df.columns:
@@ -301,11 +302,13 @@ def show_laporan_harian():
     f_pasien = filter_by_date(df_pasien)
     f_dokter = filter_by_date(df_dokter)
     f_manajemen = filter_by_date(df_manajemen)
+    f_karyawan = filter_by_date(df_karyawan)
     
     # Tag sources
     if not f_pasien.empty: f_pasien['Sumber'] = 'Pasien'
     if not f_dokter.empty: f_dokter['Sumber'] = 'Dokter'
     if not f_manajemen.empty: f_manajemen['Sumber'] = 'Manajemen'
+    if not f_karyawan.empty: f_karyawan['Sumber'] = 'Karyawan'
 
     # Filter by Shift & Supplier
     shift_options = ["Pagi (07:00-15:00)", "Siang (15:00-22:00)", "Malam (22:00-07:00)", "1 Hari"]
@@ -315,7 +318,7 @@ def show_laporan_harian():
     
     with col_f2:
         master_df = get_sheet_data(SHEET_MASTER)
-        all_dfs_for_sup = [master_df, df_masuk, df_pasien, df_dokter, df_manajemen]
+        all_dfs_for_sup = [master_df, df_masuk, df_pasien, df_dokter, df_manajemen, df_karyawan]
         supp_list = extract_unique_suppliers(pd.concat([d for d in all_dfs_for_sup if not d.empty and isinstance(d, pd.DataFrame)], ignore_index=True))
         available_sups = supp_list if supp_list else ["Pak Urip", "Wahana", "Ari Snack", "Bu Yunia", "Roti Mayestik"]
         sup_filter = st.multiselect("🏢 Filter Supplier:", available_sups, placeholder="Semua Supplier")
@@ -327,6 +330,8 @@ def show_laporan_harian():
             f_dokter = f_dokter[f_dokter['shift'].isin(selected_shifts)]
         if not f_manajemen.empty and 'shift' in f_manajemen.columns:
             f_manajemen = f_manajemen[f_manajemen['shift'].isin(selected_shifts)]
+        if not f_karyawan.empty and 'shift' in f_karyawan.columns:
+            f_karyawan = f_karyawan[f_karyawan['shift'].isin(selected_shifts)]
         if not f_masuk.empty and 'shift' in f_masuk.columns:
             shift_prefixes = [s.split()[0].lower() for s in selected_shifts]
             def match_shift(val):
@@ -345,6 +350,8 @@ def show_laporan_harian():
             f_dokter = f_dokter.iloc[0:0]
         if not f_manajemen.empty:
             f_manajemen = f_manajemen.iloc[0:0]
+        if not f_karyawan.empty:
+            f_karyawan = f_karyawan.iloc[0:0]
         if not f_masuk.empty:
             f_masuk = f_masuk.iloc[0:0]
             
@@ -352,12 +359,14 @@ def show_laporan_harian():
         f_pasien = filter_df_by_suppliers(f_pasien, sup_filter)
         f_dokter = filter_df_by_suppliers(f_dokter, sup_filter)
         f_manajemen = filter_df_by_suppliers(f_manajemen, sup_filter)
+        f_karyawan = filter_df_by_suppliers(f_karyawan, sup_filter)
         f_masuk = filter_df_by_suppliers(f_masuk, sup_filter)
         
     dfs_keluar = []
     if not f_pasien.empty: dfs_keluar.append(f_pasien)
     if not f_dokter.empty: dfs_keluar.append(f_dokter)
     if not f_manajemen.empty: dfs_keluar.append(f_manajemen)
+    if not f_karyawan.empty: dfs_keluar.append(f_karyawan)
     f_keluar = pd.concat(dfs_keluar, ignore_index=True) if dfs_keluar else pd.DataFrame()
             
     st.markdown("<br>", unsafe_allow_html=True)
@@ -367,12 +376,16 @@ def show_laporan_harian():
     t_pasien = f_keluar[f_keluar['Sumber'] == 'Pasien']['total_harga'].sum() if not f_keluar.empty and 'total_harga' in f_keluar.columns else 0
     t_dokter = f_keluar[f_keluar['Sumber'] == 'Dokter']['total_harga'].sum() if not f_keluar.empty and 'total_harga' in f_keluar.columns else 0
     t_manajemen = f_keluar[f_keluar['Sumber'] == 'Manajemen']['total_harga'].sum() if not f_keluar.empty and 'total_harga' in f_keluar.columns else 0
+    t_karyawan = f_keluar[f_keluar['Sumber'] == 'Karyawan']['total_harga'].sum() if not f_keluar.empty and 'total_harga' in f_keluar.columns else 0
     
     # Calculate Pasien breakdown
     t_kelas_1 = 0; qty_k1 = 0
     t_kelas_2 = 0; qty_k2 = 0
     t_kelas_3 = 0; qty_k3 = 0
     t_vip = 0; qty_vip = 0
+    t_maksi = 0; qty_maksi = 0
+    t_dok_pasien = 0; qty_dok_pasien = 0
+    t_ok = 0; qty_ok = 0
     total_pasien_qty = 0
     total_dokter_qty = 0
     
@@ -383,6 +396,9 @@ def show_laporan_harian():
             t_kelas_2 = df_pas[df_pas['kategori'] == 'Kelas 2']['total_harga'].sum()
             t_kelas_3 = df_pas[df_pas['kategori'] == 'Kelas 3']['total_harga'].sum()
             t_vip = df_pas[df_pas['kategori'] == 'VIP']['total_harga'].sum()
+            t_maksi = df_pas[df_pas['kategori'] == 'Maksi']['total_harga'].sum()
+            t_dok_pasien = df_pas[df_pas['kategori'] == 'Dokter']['total_harga'].sum()
+            t_ok = df_pas[df_pas['kategori'] == 'OK']['total_harga'].sum()
             
             if 'jumlah_pasien' in df_pas.columns:
                 df_pas['jumlah_pasien'] = pd.to_numeric(df_pas['jumlah_pasien'], errors='coerce').fillna(0)
@@ -392,8 +408,11 @@ def show_laporan_harian():
                 qty_k2 = unique_pasien[unique_pasien['kategori'] == 'Kelas 2']['jumlah_pasien'].sum()
                 qty_k3 = unique_pasien[unique_pasien['kategori'] == 'Kelas 3']['jumlah_pasien'].sum()
                 qty_vip = unique_pasien[unique_pasien['kategori'] == 'VIP']['jumlah_pasien'].sum()
+                qty_maksi = unique_pasien[unique_pasien['kategori'] == 'Maksi']['jumlah_pasien'].sum()
+                qty_dok_pasien = unique_pasien[unique_pasien['kategori'] == 'Dokter']['jumlah_pasien'].sum()
+                qty_ok = unique_pasien[unique_pasien['kategori'] == 'OK']['jumlah_pasien'].sum()
                 
-                total_pasien_qty = qty_k1 + qty_k2 + qty_k3 + qty_vip
+                total_pasien_qty = qty_k1 + qty_k2 + qty_k3 + qty_vip + qty_maksi + qty_dok_pasien + qty_ok
                 
         if 'kategori_freetext' in f_keluar.columns:
             df_dok = f_keluar[f_keluar['Sumber'] == 'Dokter'].copy()
@@ -438,20 +457,24 @@ def show_laporan_harian():
         c2.metric(f"Total Pasien ({total_pasien_qty:,.0f} org)", f"Rp {t_pasien:,.0f}")
         
         st.markdown("<br>", unsafe_allow_html=True)
-        c3, c4 = st.columns(2)
+        c3, c4, c5 = st.columns(3)
         c3.metric(f"Dokter ({total_dokter_qty:,.0f} org)", f"Rp {t_dokter:,.0f}")
         c4.metric("Manajemen", f"Rp {t_manajemen:,.0f}")
+        c5.metric("Karyawan", f"Rp {t_karyawan:,.0f}")
         
         st.divider()
         st.caption("Rincian Pengeluaran Pasien:")
-        p1, p2 = st.columns(2)
+        p1, p2, p3 = st.columns(3)
         p1.metric(f"Kelas 1 ({qty_k1:,.0f} org)", f"Rp {t_kelas_1:,.0f}")
         p2.metric(f"Kelas 2 ({qty_k2:,.0f} org)", f"Rp {t_kelas_2:,.0f}")
+        p3.metric(f"Kelas 3 ({qty_k3:,.0f} org)", f"Rp {t_kelas_3:,.0f}")
         
         st.markdown("<br>", unsafe_allow_html=True)
-        p3, p4 = st.columns(2)
-        p3.metric(f"Kelas 3 ({qty_k3:,.0f} org)", f"Rp {t_kelas_3:,.0f}")
+        p4, p5, p6, p7 = st.columns(4)
         p4.metric(f"VIP ({qty_vip:,.0f} org)", f"Rp {t_vip:,.0f}")
+        p5.metric(f"Maksi ({qty_maksi:,.0f} org)", f"Rp {t_maksi:,.0f}")
+        p6.metric(f"Dokter ({qty_dok_pasien:,.0f} org)", f"Rp {t_dok_pasien:,.0f}")
+        p7.metric(f"OK ({qty_ok:,.0f} org)", f"Rp {t_ok:,.0f}")
         
     st.markdown("<br>", unsafe_allow_html=True)
     
