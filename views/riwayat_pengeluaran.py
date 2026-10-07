@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 from data.sheets_repository import (
     get_sheet_data, save_data, SHEET_MASTER, SHEET_STOK_MASUK, SHEET_LOG,
-    SHEET_PENGELUARAN_PASIEN, SHEET_PENGELUARAN_DOKTER, SHEET_PENGELUARAN_MANAJEMEN
+    SHEET_PENGELUARAN_PASIEN, SHEET_PENGELUARAN_DOKTER, SHEET_PENGELUARAN_MANAJEMEN, SHEET_PENGELUARAN_KARYAWAN
 )
 from views.transaksi import extract_unique_suppliers, match_supplier
 from views.pengeluaran_common import show_toast
@@ -40,6 +40,7 @@ def load_all_pengeluaran_df():
     trx_pasien = get_sheet_data(SHEET_PENGELUARAN_PASIEN)
     trx_dokter = get_sheet_data(SHEET_PENGELUARAN_DOKTER)
     trx_manajemen = get_sheet_data(SHEET_PENGELUARAN_MANAJEMEN)
+    trx_karyawan = get_sheet_data(SHEET_PENGELUARAN_KARYAWAN)
     
     rows = []
     
@@ -118,6 +119,31 @@ def load_all_pengeluaran_df():
                 'keterangan': str(r.get('keterangan', '')) if pd.notna(r.get('keterangan')) and str(r.get('keterangan')).strip() not in ['nan', 'None'] else "",
                 'hapus': False
             })
+
+    if not trx_karyawan.empty and 'tanggal' in trx_karyawan.columns:
+        for idx, r in trx_karyawan.iterrows():
+            qty = pd.to_numeric(str(r.get('qty', 0)).replace(',', '.'), errors='coerce') or 0.0
+            p_val = pd.to_numeric(str(r.get('harga_real', 0)).replace(',', '.'), errors='coerce') or 0.0
+            tot = pd.to_numeric(str(r.get('total_harga', qty * p_val)).replace(',', '.'), errors='coerce') or (qty * p_val)
+            rows.append({
+                '_id': f"KARYAWAN_{idx}",
+                '_cat_type': 'KARYAWAN',
+                '_orig_idx': idx,
+                'sumber': '👥 Karyawan',
+                'tanggal': str(r.get('tanggal', ''))[:10],
+                'shift': str(r.get('shift', '-')),
+                'kategori': str(r.get('kategori', '-')),
+                'tujuan': str(r.get('kategori_freetext', '-')),
+                'nama_barang': str(r.get('nama_barang', '')),
+                'supplier': str(r.get('supplier', '-')),
+                'satuan': str(r.get('satuan', 'Pcs')),
+                'qty': float(qty),
+                'harga_real': float(p_val),
+                'total_harga': float(tot),
+                'jumlah_pasien': 0,
+                'keterangan': str(r.get('keterangan', '')) if pd.notna(r.get('keterangan')) and str(r.get('keterangan')).strip() not in ['nan', 'None'] else "",
+                'hapus': False
+            })
             
     if not rows:
         return pd.DataFrame(columns=[
@@ -159,7 +185,8 @@ def execute_unified_pengeluaran_save(items_by_cat, master_df):
     category_sheet_map = {
         'PASIEN': SHEET_PENGELUARAN_PASIEN,
         'DOKTER': SHEET_PENGELUARAN_DOKTER,
-        'MANAJEMEN': SHEET_PENGELUARAN_MANAJEMEN
+        'MANAJEMEN': SHEET_PENGELUARAN_MANAJEMEN,
+        'KARYAWAN': SHEET_PENGELUARAN_KARYAWAN
     }
 
     for cat_type, items_to_process in items_by_cat.items():
@@ -433,7 +460,7 @@ def render_riwayat_pengeluaran_excel(master_df):
             date_range = st.date_input("📅 Rentang Tanggal:", value=(today, today), key="rwe_date_range")
             k_start, k_end = parse_date_range(date_range, today)
         with c2:
-            sumber_opts = ["Semua Pengeluaran", "🛏️ Pasien", "🩺 Dokter", "🏢 Manajemen"]
+            sumber_opts = ["Semua Pengeluaran", "🛏️ Pasien", "🩺 Dokter", "🏢 Manajemen", "👥 Karyawan"]
             sel_sumber = st.selectbox("📂 Sumber Pengeluaran:", sumber_opts, key="rwe_sel_sumber")
 
         # Ambil opsi kategori secara dinamis sesuai pilihan Sumber Pengeluaran
@@ -443,6 +470,8 @@ def render_riwayat_pengeluaran_excel(master_df):
             df_for_cat = all_trx[all_trx['sumber'] == "🩺 Dokter"]
         elif sel_sumber == "🏢 Manajemen":
             df_for_cat = all_trx[all_trx['sumber'] == "🏢 Manajemen"]
+        elif sel_sumber == "👥 Karyawan":
+            df_for_cat = all_trx[all_trx['sumber'] == "👥 Karyawan"]
         else:
             df_for_cat = all_trx
 
@@ -490,7 +519,7 @@ def render_riwayat_pengeluaran_excel(master_df):
         mask = mask & q_mask
 
     if sel_sumber == "Semua Pengeluaran":
-        cat_order_map = {'PASIEN': 1, 'DOKTER': 2, 'MANAJEMEN': 3}
+        cat_order_map = {'PASIEN': 1, 'DOKTER': 2, 'MANAJEMEN': 3, 'KARYAWAN': 4}
         filtered_data = df_filtered[mask].copy()
         filtered_data['_sort_rank'] = filtered_data['_cat_type'].map(cat_order_map).fillna(99)
         filtered_data = filtered_data.sort_values(by=['_sort_rank', 'tanggal'], ascending=[True, False]).drop(columns=['_sort_rank'])
@@ -569,6 +598,26 @@ def render_riwayat_pengeluaran_excel(master_df):
                 "keterangan": st.column_config.TextColumn("Keterangan / Catatan"),
                 "hapus": st.column_config.CheckboxColumn("Hapus 🗑️", help="Centang untuk menandai transaksi ini dihapus", default=False)
             }
+        elif sel_sumber == "👥 Karyawan":
+            cols_to_display = [
+                'tanggal', 'shift', 'kategori', 'tujuan', 'nama_barang', 
+                'supplier', 'satuan', 'qty', 'harga_real', 'total_harga', 
+                'keterangan', 'hapus'
+            ]
+            column_config = {
+                "tanggal": st.column_config.TextColumn("Tanggal", disabled=True, width="small"),
+                "shift": st.column_config.TextColumn("Shift", disabled=True, width="small"),
+                "kategori": st.column_config.TextColumn("Kategori", disabled=True, width="medium"),
+                "tujuan": st.column_config.TextColumn("👥 Nama Karyawan", disabled=True, width="medium"),
+                "nama_barang": st.column_config.TextColumn("Nama Barang", disabled=True, width="medium"),
+                "supplier": st.column_config.TextColumn("Supplier", disabled=True, width="small"),
+                "satuan": st.column_config.TextColumn("Satuan", disabled=True, width="small"),
+                "qty": st.column_config.NumberColumn("Qty Keluar", min_value=0.0, step=0.05, format="%.2f", required=True),
+                "harga_real": st.column_config.NumberColumn("Harga Real (Rp)", min_value=0, step=100, format="Rp %d", required=True),
+                "total_harga": st.column_config.NumberColumn("Total Biaya (Rp)", format="Rp %d", disabled=True),
+                "keterangan": st.column_config.TextColumn("Keterangan / Catatan"),
+                "hapus": st.column_config.CheckboxColumn("Hapus 🗑️", help="Centang untuk menandai transaksi ini dihapus", default=False)
+            }
         else:
             cols_to_display = [
                 'sumber', 'tanggal', 'shift', 'kategori', 'tujuan', 'nama_barang', 
@@ -638,7 +687,7 @@ def render_riwayat_pengeluaran_excel(master_df):
         edited_df['total_harga'] = edited_df['qty'] * edited_df['harga_real']
 
         # Analisis perubahan dan deteksi baris yang dihapus/diedit
-        items_to_save_by_cat = {'PASIEN': [], 'DOKTER': [], 'MANAJEMEN': []}
+        items_to_save_by_cat = {'PASIEN': [], 'DOKTER': [], 'MANAJEMEN': [], 'KARYAWAN': []}
         grand_old_total = float(df_editor_input['total_harga'].sum())
         grand_new_total = 0.0
         changed_count = 0
